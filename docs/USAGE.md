@@ -541,12 +541,16 @@ CI (`.github/workflows/ci.yml`): pytest on Python 3.10–3.13 with `requirements
 `twine check` and installation of the wheel into a fresh venv.
 
 **Release:**
-1. Bump the version in `websearch/__init__.py` (`pyproject.toml` reads it from there).
+1. Bump the version in `websearch/__init__.py` (`pyproject.toml` reads it from there) and in `server.json`.
 2. If dependencies changed: `uv pip compile pyproject.toml --universal --python-version 3.10 -o requirements.lock`.
 3. Add a section to `CHANGELOG.md` (`## [X.Y.Z] – date`; it becomes the text of the GitHub release).
 4. `git tag vX.Y.Z && git push origin vX.Y.Z` – `.github/workflows/release.yml` checks tag and version, runs
    the tests, publishes to PyPI (trusted publishing, package `websearch-mcp`), the multi-arch image to
    `ghcr.io/c0decave/web-search-mcp`, and creates the GitHub release. Versions with `a`, `b` or `rc` (e.g.
    `0.3.0rc1`) are marked as pre-release: no `latest` image, and pip installs them only with `--pre`.
+   After PyPI, the job `mcp-registry` publishes `server.json` to the official MCP Registry (login via GitHub
+   OIDC, no token). Bump the version in `server.json` too – a test checks that it matches.
+   If PyPI or the registry failed: Actions → "Publish existing release" → Run workflow with the tag
+   (`.github/workflows/publish.yml` uploads that release's files and repeats the registry step).
 5. Once: create a trusted publisher on PyPI (workflow `release.yml`, environment `pypi`), create the `pypi`
    environment in GitHub, set the ghcr package to "public" after the first push.

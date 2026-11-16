@@ -74,7 +74,7 @@ exclude = ["__pycache__", "*.pyc"]
 include = ["/websearch", "/tests", "/README.md", "/README.de.md", "/ANALYSE.md", "/CHANGELOG.md", "/docs", "/LICENSE", "/pyproject.toml",
            "/requirements.lock", "/build-requirements.lock", "/build-requirements.in", "/.env.example",
            "/.env.example.de", "/watches.example.json", "/docker-compose.yml", "/Dockerfile", "/.dockerignore",
-           "/searxng/settings.yml", "/deploy"]
+           "/searxng/settings.yml", "/deploy", "/server.json"]
 exclude = ["__pycache__", "*.pyc"]
 
 [tool.pytest.ini_options]

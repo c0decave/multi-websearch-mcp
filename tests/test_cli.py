@@ -132,3 +132,15 @@ def test_websearch_mcp_entry_point_starts_the_mcp_server(monkeypatch):
         monkeypatch.setattr(M.sys, "argv", ["websearch-mcp", *argv])
         M.run_mcp()
         assert seen[-1] == want
+
+
+def test_server_json_matches_package_version():
+    """server.json (MCP Registry) muss dieselbe Version beschreiben wie das Paket - sonst scheitert der Release."""
+    import json
+    from pathlib import Path
+    from websearch import __version__
+    d = json.loads((Path(__file__).resolve().parent.parent / "server.json").read_text(encoding="utf-8"))
+    assert d["name"] == "io.github.c0decave/web-search-mcp" and len(d["description"]) <= 100
+    assert {d["version"]} | {p["version"] for p in d["packages"]} == {__version__}
+    readme = (Path(__file__).resolve().parent.parent / "README.md").read_text(encoding="utf-8")
+    assert f"mcp-name: {d['name']}" in readme                     # Eigentumsnachweis für die Registry

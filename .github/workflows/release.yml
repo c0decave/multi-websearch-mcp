@@ -1,5 +1,6 @@
 # Release bei Tag v*: Tests -> sdist/wheel -> PyPI (Trusted Publishing) + Multi-Arch-Image auf ghcr.io
 #                      + GitHub-Release (Text aus CHANGELOG.md; a/b/rc-Versionen als Vorabversion)
+#                      + Eintrag in die offizielle MCP Registry (server.json, nach PyPI)
 #
 # Einmalig einrichten:
 #  - PyPI: Projekt -> Publishing -> "Add a trusted publisher" (GitHub, dieses Repo,
@@ -65,6 +66,8 @@ jobs:
       - uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086  # release/v1
         with:
           skip-existing: true    # schon (z.B. von Hand) hochgeladene Version ist kein Fehler
+          # Übergangsweise API-Token (Secret der Umgebung "pypi"); ist es gelöscht, greift Trusted Publishing
+          password: ${{ secrets.PYPI_API_TOKEN }}
 
   docker:
     name: Docker image (amd64 + arm64) -> ghcr.io
@@ -107,6 +110,18 @@ jobs:
           annotations: ${{ steps.meta.outputs.annotations }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  mcp-registry:
+    name: MCP Registry
+    needs: pypi                # die Registry prüft das Paket auf PyPI
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write          # Login bei der Registry per GitHub-OIDC, kein Token nötig
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
+      - name: server.json veröffentlichen
+        run: .github/scripts/publish-mcp-registry.sh "${GITHUB_REF_NAME#v}"
 
   github-release:
     name: GitHub release

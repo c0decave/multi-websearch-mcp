@@ -1,0 +1,59 @@
+# Ein bestehendes GitHub-Release nachträglich veröffentlichen: dessen Dateien auf PyPI, dann server.json in die
+# MCP Registry. Für den Fall, dass beim Release PyPI oder die Registry fehlschlug (z.B. vor dem Einrichten von
+# PyPI). Starten: Actions -> "Publish existing release" -> Run workflow, Tag angeben (z.B. v0.3.0rc1).
+name: Publish existing release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release-Tag, z.B. v0.3.0rc1"
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  pypi:
+    name: Release files -> PyPI
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/websearch-mcp/
+    steps:
+      - name: Dateien des Releases laden (genau die, die der Release-Workflow gebaut und getestet hat)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" -p '*.whl' -p '*.tar.gz' -D dist
+          ls -l dist
+      - uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086  # release/v1
+        with:
+          skip-existing: true
+          # Trusted Publishing gilt für release.yml; hier daher das API-Token aus der Umgebung "pypi"
+          password: ${{ secrets.PYPI_API_TOKEN }}
+
+  mcp-registry:
+    name: MCP Registry
+    needs: pypi
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
+        with:
+          ref: ${{ inputs.tag }}
+      - name: Skript vom aktuellen Stand holen (ältere Tags haben es noch nicht)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p .github/scripts
+          gh api "repos/$GITHUB_REPOSITORY/contents/.github/scripts/publish-mcp-registry.sh?ref=$GITHUB_SHA" \
+            -H "Accept: application/vnd.github.raw" > .github/scripts/publish-mcp-registry.sh
+          chmod +x .github/scripts/publish-mcp-registry.sh
+      - name: server.json veröffentlichen
+        env:
+          TAG: ${{ inputs.tag }}
+        run: .github/scripts/publish-mcp-registry.sh "${TAG#v}"
