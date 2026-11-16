@@ -1,6 +1,7 @@
-# Ein bestehendes GitHub-Release nachträglich veröffentlichen: dessen Dateien auf PyPI, dann server.json in die
-# MCP Registry. Für den Fall, dass beim Release PyPI oder die Registry fehlschlug (z.B. vor dem Einrichten von
-# PyPI). Starten: Actions -> "Publish existing release" -> Run workflow, Tag angeben (z.B. v0.3.0rc1).
+# Ein bestehendes GitHub-Release nachträglich veröffentlichen: dessen Dateien auf PyPI (übersprungen, wenn die
+# Version dort schon liegt), dann server.json in die MCP Registry. Für den Fall, dass beim Release PyPI oder die
+# Registry fehlschlug. Starten: Actions -> "Publish existing release" -> Run workflow, Tag angeben (z.B. v0.3.0rc1).
+# Für den PyPI-Upload von hier muss auf PyPI auch publish.yml als Trusted Publisher eingetragen sein.
 name: Publish existing release
 
 on:
@@ -20,8 +21,20 @@ jobs:
     environment:
       name: pypi
       url: https://pypi.org/project/websearch-mcp/
+    permissions:
+      contents: read
+      id-token: write          # Trusted Publishing (dafür auf PyPI auch diesen Workflow als Publisher eintragen)
     steps:
+      - name: Schon auf PyPI?
+        id: check
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          code=$(curl -s -o /dev/null -w '%{http_code}' "https://pypi.org/pypi/websearch-mcp/${TAG#v}/json")
+          echo "exists=$([ "$code" = 200 ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          [ "$code" = 200 ] && echo "websearch-mcp ${TAG#v} liegt schon auf PyPI - Upload wird übersprungen" || true
       - name: Dateien des Releases laden (genau die, die der Release-Workflow gebaut und getestet hat)
+        if: steps.check.outputs.exists != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ inputs.tag }}
@@ -29,10 +42,9 @@ jobs:
           gh release download "$TAG" --repo "$GITHUB_REPOSITORY" -p '*.whl' -p '*.tar.gz' -D dist
           ls -l dist
       - uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086  # release/v1
+        if: steps.check.outputs.exists != 'true'
         with:
           skip-existing: true
-          # Trusted Publishing gilt für release.yml; hier daher das API-Token aus der Umgebung "pypi"
-          password: ${{ secrets.PYPI_API_TOKEN }}
 
   mcp-registry:
     name: MCP Registry
