@@ -1,0 +1,306 @@
+#!/usr/bin/env bash
+# websearch in einer bubblewrap-Sandbox  /  websearch inside a bubblewrap sandbox
+#
+#   deploy/bwrap/websearch-bwrap [OPTIONEN] [--] BEFEHL [ARGUMENTE]
+#   deploy/bwrap/websearch-bwrap search "open source metasearch" -n 5
+#   deploy/bwrap/websearch-bwrap mcp --http
+#   deploy/bwrap/websearch-bwrap monitor watches/watches.json --loop
+#   claude mcp add -s user websearch -- /pfad/zum/repo/deploy/bwrap/websearch-bwrap mcp   (stdio, liest .env / reads .env)
+#
+# Optionen / options:
+#   --env DATEI     .env laden (Standard: <repo>/.env, falls vorhanden; WEBSEARCH_ENV_FILE; auch: --env-file)
+#                   / load this .env (default: <repo>/.env if present)
+#   --data DIR      einziges schreibbares Verzeichnis (Standard: ~/.local/share/websearch; WEBSEARCH_DATA)
+#                   / the only writable directory
+#   --ro PFAD       zusätzlich lesbar einblenden (mehrfach möglich) / additionally mount read-only (repeatable)
+#   --rw PFAD       zusätzlich schreibbar einblenden (mehrfach; nie $HOME, Repo, venv; in $HOME nur
+#                   ~/.local/share/websearch* und ~/.cache/websearch*) / additionally mount writable (repeatable;
+#                   never $HOME, repo, venv; inside $HOME only ~/.local/share/websearch* and ~/.cache/websearch*)
+#   --rw-unsafe PFAD  wie --rw, auch an anderen Orten in $HOME (mit Warnung; gilt auch für --data darin)
+#                   / like --rw, also elsewhere in $HOME (with a warning; also allows --data inside it)
+#   --print         bwrap-Aufruf nur anzeigen (Geheimnisse maskiert) / only show the bwrap call (secrets masked)
+#
+# Sandbox:
+#   * Dateisystem nur lesbar; $HOME, /home, /root, /srv, /mnt, /media, /tmp, /var/tmp und /run leer überlagert
+#     (SSH-Schlüssel, Browserprofile, fremde Homes, D-Bus/ssh-agent/Podman-Sockets unsichtbar); wieder
+#     eingeblendet: das Repo (lesend, ohne .env*, .git), die Python-Umgebung (lesend), die Datei aus
+#     'monitor DATEI'/'many DATEI' (lesend; bei monitor das Verzeichnis, wenn es nur *.json enthält - dann
+#     greift Hot-Reload) und das Datenverzeichnis (schreibend, zugleich Arbeitsverzeichnis). Suchbegriffe
+#     werden nie als Pfade behandelt. Startet nicht als root (WEBSEARCH_BWRAP_ALLOW_ROOT=1).
+#     / read-only file system; $HOME, /home, /root, /srv, /mnt, /media, /tmp, /var/tmp, /run empty; only the
+#     repo (without .env*), the venv, the file given to monitor/many (monitor: its directory if it holds only
+#     *.json) and the data directory (writable, also the working directory). Refuses to run as root.
+#   * eigene Namespaces (keine weiteren User-Namespaces), Netz geteilt (zum Suchen nötig), keine Capabilities,
+#     seccomp: keine Unix-Sockets außer verbundenen Stream-Paaren (asyncio), kein io_uring; neue Session; endet mit
+#     dem aufrufenden Prozess / own namespaces, shared network, no capabilities, seccomp (no unix sockets except
+#     connected stream pairs for asyncio, no io_uring)
+#   * leere Umgebung: nur Variablen, die websearch liest (aus .env und der aktuellen Umgebung, letztere
+#     gewinnt; nicht SEARXNG_SECRET), Sprache, Terminal, SSL_CERT_FILE/SSL_CERT_DIR/REQUESTS_CA_BUNDLE. Alle bwrap-Optionen gehen über eine Pipe
+#     (bwrap --args), Tokens stehen also nicht in /proc/*/cmdline. Python läuft isoliert (-I).
+#     / empty environment; options go through a pipe (no secrets in /proc/*/cmdline); python -I
+#   * WEBSEARCH_CACHE, WEBSEARCH_MONITOR_DB, WEBSEARCH_MONITOR_OUT, WEBSEARCH_HEARTBEAT müssen im
+#     Datenverzeichnis (relativ = darin) oder in einem --rw-Verzeichnis liegen
+#     / must be inside the data directory (relative = inside it) or a --rw directory
+# Umgebung / environment: WEBSEARCH_BWRAP (bwrap-Binary), WEBSEARCH_PYTHON (Python mit websearch / with websearch),
+#   WEBSEARCH_BWRAP_SECCOMP=0, WEBSEARCH_BWRAP_DISABLE_USERNS=0 (Schutz abschalten / turn protection off)
+set -euo pipefail
+
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+repo="$(cd "$here/../.." && pwd -P)"
+bwrap_bin="${WEBSEARCH_BWRAP:-bwrap}"
+py="${WEBSEARCH_PYTHON:-}"
+if [[ -z "$py" ]]; then
+  if [[ -x "$repo/.venv/bin/python" ]]; then py="$repo/.venv/bin/python"; else py="$(command -v python3 || true)"; fi
+fi
+envfile="${WEBSEARCH_ENV_FILE:-}"
+[[ -z "$envfile" && -f "$repo/.env" ]] && envfile="$repo/.env"
+data="${WEBSEARCH_DATA:-${XDG_DATA_HOME:-$HOME/.local/share}/websearch}"
+print_only=0
+ro_paths=() rw_paths=() unsafe_paths=()
+sb_name="websearch-bwrap"
+
+usage() { sb_usage "${BASH_SOURCE[0]}"; }
+die() { echo "websearch-bwrap: $*" >&2; exit 2; }
+sb_python="$py"
+# shellcheck source=../lib/sandbox.sh
+source "$here/../lib/sandbox.sh"
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --env|--env-file) [[ $# -ge 2 ]] || die "$1 braucht eine Datei / needs a file"; envfile="$2"; shift 2 ;;
+    --env=*|--env-file=*) envfile="${1#*=}"; shift ;;
+    --data)  [[ $# -ge 2 ]] || die "--data braucht ein Verzeichnis / needs a directory"; data="$2"; shift 2 ;;
+    --ro|--rw|--rw-unsafe)
+             [[ -e "${2:-}" ]] || die "$1: ${2:-} gibt es nicht / does not exist"
+             case "$1" in
+               --ro) ro_paths+=("$(realpath "$2")") ;;
+               --rw) rw_paths+=("$(realpath "$2")") ;;
+               *) rw_paths+=("$(realpath "$2")"); unsafe_paths+=("$(realpath "$2")") ;;
+             esac
+             shift 2 ;;
+    --print) print_only=1; shift ;;
+    -h|--help) usage; exit 0 ;;
+    --) shift; break ;;
+    *) break ;;
+  esac
+done
+[[ $# -gt 0 ]] || { usage >&2; exit 2; }
+[[ $print_only -eq 1 ]] || sb_check_root
+
+# --- Python mit websearch? (Standard: <repo>/.venv)
+venv_hint="'pip install -e .' im Repo (bzw. python3 -m venv .venv && .venv/bin/pip install -e .) oder WEBSEARCH_PYTHON setzen / run 'pip install -e .' in the repo or set WEBSEARCH_PYTHON"
+[[ -n "$py" && -x "$py" ]] || die "kein Python gefunden / no Python found - $venv_hint"
+base_prefix="$("$py" -I -c 'import sys, websearch.envfile; print("OK:" + sys.base_prefix)' 2>/dev/null || true)"
+[[ "$base_prefix" == OK:/* ]] || die "$py: websearch fehlt oder ist zu alt / websearch missing or too old - $venv_hint"
+base_prefix="$(realpath "${base_prefix#OK:}")"
+if [[ $print_only -eq 0 ]] && ! command -v "$bwrap_bin" >/dev/null 2>&1; then
+  die "bwrap nicht gefunden - bubblewrap installieren (apt/dnf/pacman install bubblewrap) / bwrap not found - install bubblewrap"
+fi
+[[ -z "$envfile" || -f "$envfile" ]] || die "--env: $envfile gibt es nicht / does not exist"
+venv="$(cd "$(dirname "$py")/.." && pwd -P)"
+cwd="$(pwd -P)"
+
+# --- Schreibbare Verzeichnisse: nie $HOME (oder darüber), nie Repo/venv/SearXNG (Code, der später ohne
+# Sandbox läuft); in $HOME nur ~/.local/share/websearch* und ~/.cache/websearch*, sonst nur mit --rw-unsafe
+check_writable() {   # $1 Bezeichnung, $2 Pfad (aufgelöst)
+  local what="$1" p="$2" bad=0 v
+  sb_exposes_home "$p" && bad=1
+  sb_overlaps "$p" "$repo" && bad=1
+  # SearXNG-Quellcode läuft außerhalb dieser Sandbox (searxng-bwrap update/run)
+  for v in "${SEARXNG_SRC:-}" "${XDG_DATA_HOME:-$HOME/.local/share}/websearch-searxng"; do
+    [[ -n "$v" ]] && sb_overlaps "$p" "$(realpath -m "$v")" && bad=1
+  done
+  for v in "$venv" "$base_prefix"; do                     # System-Python (/usr, /) nur auf Gleichheit/Inhalt
+    [[ "$v" == "/" ]] && continue
+    sb_overlaps "$p" "$v" && bad=1
+  done
+  if [[ $bad -eq 1 ]]; then
+    die "$what $p: darf weder \$HOME (oder darüber) sein noch Repo, Python-Umgebung oder SearXNG-Quellcode" \
+        "berühren / must not be (or contain) \$HOME, nor overlap the repo, the Python environment or the" \
+        "SearXNG source"
+  fi
+  sb_home_allowed "$p" && return 0
+  for v in "${unsafe_paths[@]}"; do sb_within "$v" "$p" && return 0; done
+  die "$what $p: im Home-Verzeichnis sind nur ~/.local/share/websearch* und ~/.cache/websearch* schreibbar" \
+      "(fast alles andere in ~ führen Programme aus: ~/.config, ~/.local/bin, ~/go/bin, ~/.local/share/pipx ...)." \
+      "Bewusst trotzdem: --rw-unsafe $p / in the home directory only ~/.local/share/websearch* and" \
+      "~/.cache/websearch* are writable - to allow it anyway: --rw-unsafe $p"
+}
+data="$(realpath -m "$data")"
+for p in "${rw_paths[@]}"; do check_writable "--rw" "$p"; done
+check_writable "--data" "$data"
+for p in "${unsafe_paths[@]}"; do
+  echo "websearch-bwrap: Warnung: $p ist für die Sandbox schreibbar (--rw-unsafe) - dort abgelegter Code oder" \
+       "Konfiguration kann außerhalb der Sandbox wirken / warning: writable for the sandbox (--rw-unsafe) -" \
+       "code or configuration placed there may take effect outside the sandbox" >&2
+done
+# erst nach der Prüfung anlegen; nur selbst angelegte Verzeichnisse auf 0700 setzen
+if [[ ! -d "$data" ]]; then
+  mkdir -p "$data" && chmod 700 "$data"
+fi
+for p in "${ro_paths[@]}"; do
+  sb_exposes_home "$p" && die "--ro $p: würde das ganze Home-Verzeichnis einblenden - Unterverzeichnis angeben" \
+                              "/ would expose the whole home directory - use a subdirectory"
+done
+
+sb_detect "$bwrap_bin"
+sb_base websearch
+sb_args+=(--ro-bind "$repo" "$repo")
+# Python-Umgebung (und ihr Basis-Python, z.B. pyenv/uv unter ~) nur lesbar, falls sonst unsichtbar
+for p in "$venv" "$base_prefix"; do
+  sb_within "$repo" "$p" && continue
+  sb_hidden "$p" || continue
+  sb_exposes_home "$p" && die "Python-Umgebung $p würde das Home-Verzeichnis einblenden - venv in ein" \
+                              "Unterverzeichnis legen / Python environment $p would expose the home directory"
+  sb_args+=(--ro-bind "$p" "$p")
+done
+sb_args+=(--bind "$data" "$data")
+# SearXNG-Quellcode im Datenverzeichnis (alter Standardort) immer nur lesbar - auch wenn es ihn (noch) nicht
+# gibt: Die Sandbox darf dort nichts anlegen, was 'searxng-bwrap' später ausführen würde
+for p in "${SEARXNG_SRC:-}" "$data/searxng-src"; do
+  [[ -n "$p" ]] || continue
+  lex="$(realpath -m -s "$p")"                   # ohne Symlinks aufzulösen
+  sb_within "$data" "$lex" || sb_within "$data" "$(realpath -m "$p")" || continue
+  # ein Symlink irgendwo im Pfad (von der Sandbox angelegt?) würde auf ein anderes Ziel umleiten
+  [[ -L "$lex" || "$(realpath -m "$p")" != "$lex" ]] \
+    && die "$p enthält einen Symlink - entfernen (könnte aus der Sandbox stammen) / contains a symlink - remove it"
+  mkdir -p "$lex"
+  sb_args+=(--ro-bind "$lex" "$lex")
+done
+for p in "${ro_paths[@]}"; do sb_args+=(--ro-bind "$p" "$p"); done
+for p in "${rw_paths[@]}"; do sb_args+=(--bind "$p" "$p"); done
+mask_dirs=("$repo" "${ro_paths[@]}" "${rw_paths[@]}")
+
+# --- Argumente: nur die Datei von 'monitor DATEI' und 'many DATEI' ist ein Pfad (Suchbegriffe nie). Sie wird
+# absolut gemacht (Arbeitsverzeichnis ist das Datenverzeichnis) und lesend eingeblendet - bei monitor das
+# Verzeichnis, damit Hot-Reload (Datei wird beim Speichern ersetzt) funktioniert.
+# Verzeichnis darf nur eingeblendet werden, wenn es ausschließlich Watch-Dateien enthält (keine Geschwister-
+# Repos, keine .env/.git) - und nie $HOME, /tmp o.ä.
+watch_dir_ok() {
+  local d="$1" f n
+  sb_exposes_home "$d" && return 1
+  for n in / /tmp /var/tmp /run /var/run "${sb_hidden_dirs[@]}"; do [[ "$d" == "$n" ]] && return 1; done
+  for f in "$d"/* "$d"/.*; do
+    n="${f##*/}"
+    [[ "$n" == "." || "$n" == ".." || "$n" == "*" || "$n" == ".*" ]] && continue
+    [[ "$n" == *.json* && ! -L "$f" && ! -d "$f" ]] || return 1    # *.json und Editor-Reste (.x.json.swp)
+  done
+  return 0
+}
+fwd=() command="" fileopt=0 skip=0
+value_opts=" -k --kind -n -l --lang -d --days -s --sources --deadline --concurrency --interval "
+for a in "$@"; do
+  if [[ $skip -eq 1 ]]; then fwd+=("$a"); skip=0; continue; fi
+  if [[ $skip -eq 2 ]]; then envfile="$a"; skip=0; continue; fi
+  if [[ -z "$command" ]]; then
+    case "$a" in
+      --env-file) skip=2; continue ;;            # globale websearch-Option: die Sandbox lädt die .env selbst
+      --env-file=*) envfile="${a#*=}"; continue ;;
+      -*) fwd+=("$a"); continue ;;
+      *) command="$a"; fwd+=("$a"); continue ;;
+    esac
+  fi
+  if [[ "$command" == monitor || "$command" == many ]] && [[ $fileopt -eq 0 ]]; then
+    if [[ "$a" != -* && "$a" != "" ]]; then
+      fileopt=1
+      [[ "$a" != /* ]] && a="$cwd/$a"
+      a="$(realpath -m "$a")"
+      if [[ -e "$a" ]]; then
+        a="$(realpath "$a")"
+        dir="$(dirname "$a")"
+        if [[ "$command" == many ]]; then
+          sb_args+=(--ro-bind "$a" "$a")
+        elif watch_dir_ok "$dir"; then
+          sb_args+=(--ro-bind "$dir" "$dir"); mask_dirs+=("$dir")
+        else
+          echo "websearch-bwrap: $dir enthält mehr als Watch-Dateien (*.json) - nur $a wird eingeblendet" \
+               "(not mounted: directory). Ersetzt der Editor die Datei beim Speichern, wird die Änderung erst nach" \
+               "einem Neustart sichtbar - eigenes Verzeichnis nur für watches.json nutzen / the directory contains" \
+               "more than watch files: only the file is mounted; edits that replace the file need a restart" >&2
+          sb_args+=(--ro-bind "$a" "$a")
+        fi
+      fi
+      fwd+=("$a"); continue
+    fi
+    [[ " $value_opts " == *" $a "* ]] && skip=1
+  fi
+  fwd+=("$a")
+done
+[[ $skip -eq 2 ]] && die "--env-file braucht eine Datei / needs a file"
+[[ -z "$envfile" || -f "$envfile" ]] || die "--env-file: $envfile gibt es nicht / does not exist"
+
+# --- Umgebung: .env (ohne sie auszuführen, Regeln wie docker compose: websearch/envfile.py) + erlaubte
+# Variablen der aktuellen Umgebung (gewinnen)
+declare -A envmap=()
+# Nur Variablen, die websearch liest (auch aus der .env): SEARXNG_SECRET u.ä. bleiben draußen
+allow='^(WEBSEARCH_|MCP_|REDDIT_|MARGINALIA_|DDGS_|EXA_|PERPLEXITY_|BRAVE_|SERPER_|TAVILY_|LINKUP_|LC_)'
+allow_exact='^(SEARXNG_URL|LANG|LANGUAGE|TERM|TZ|NO_COLOR|SSL_CERT_FILE|SSL_CERT_DIR|REQUESTS_CA_BUNDLE)$'
+wanted() {
+  [[ "$1" =~ $allow || "$1" =~ $allow_exact ]] || return 1
+  case "$1" in WEBSEARCH_BWRAP*|WEBSEARCH_PYTHON|WEBSEARCH_DATA|WEBSEARCH_ENV_FILE) return 1 ;; esac
+  return 0
+}
+if [[ -n "$envfile" ]]; then
+  [[ -r "$envfile" ]] || die "$envfile: nicht lesbar / not readable"
+  while IFS= read -r -d '' k && IFS= read -r -d '' v; do wanted "$k" && envmap["$k"]="$v"; done \
+    < <("$py" -I -m websearch.envfile "$envfile")
+fi
+while IFS= read -r k; do
+  wanted "$k" && envmap["$k"]="${!k}"
+done < <(compgen -e)
+
+: "${envmap[WEBSEARCH_CACHE]:=$data/cache.db}"
+: "${envmap[WEBSEARCH_MONITOR_DB]:=$data/monitor.db}"
+envmap[HOME]="$data"
+envmap[WEBSEARCH_SANDBOX]="bwrap"
+envmap[PATH]="$(dirname "$py"):/usr/local/bin:/usr/bin:/bin"
+envmap[PYTHONDONTWRITEBYTECODE]="1"
+
+# Dateien, die websearch schreibt: nur im Datenverzeichnis (relativ = darin) oder in einem --rw-Verzeichnis
+for key in WEBSEARCH_CACHE WEBSEARCH_MONITOR_DB WEBSEARCH_MONITOR_OUT WEBSEARCH_HEARTBEAT; do
+  f="${envmap[$key]:-}"
+  [[ -z "$f" ]] && continue
+  [[ "$f" != /* ]] && f="$data/$f"
+  dir="$(realpath -m "$(dirname "$f")")"
+  ok=0
+  for w in "$data" "${rw_paths[@]}"; do sb_within "$w" "$dir" && ok=1; done
+  [[ $ok -eq 1 ]] || die "$key=${envmap[$key]} liegt außerhalb des Datenverzeichnisses $data - Pfad darin" \
+                         "(oder relativ) angeben bzw. --rw VERZEICHNIS / is outside the data directory - use a" \
+                         "path inside it (or a relative one) or add --rw DIR"
+  mkdir -p "$dir"
+  envmap[$key]="$dir/$(basename "$f")"
+done
+
+# eigene CA-Zertifikate: Pfade, die sonst unsichtbar wären, lesend einblenden
+declare -A certs=()
+for key in SSL_CERT_FILE SSL_CERT_DIR REQUESTS_CA_BUNDLE; do
+  [[ -n "${envmap[$key]:-}" ]] || continue
+  IFS=: read -r -a parts <<< "${envmap[$key]}"
+  for p in "${parts[@]}"; do
+    [[ -n "$p" && -e "$p" ]] || continue
+    p="$(realpath "$p")"
+    sb_hidden "$p" || continue
+    [[ -n "${certs[$p]:-}" ]] && continue
+    certs[$p]=1
+    if sb_exposes_home "$p"; then
+      echo "websearch-bwrap: $key=$p würde das Home-Verzeichnis einblenden - nicht eingeblendet / not mounted" >&2
+    else
+      sb_args+=(--ro-bind "$p" "$p")
+    fi
+  done
+done
+
+# Geheimnisse überdecken - zuletzt, damit kein späterer Mount sie wieder sichtbar macht
+for d in "${mask_dirs[@]}"; do sb_mask_dir "$d"; done
+[[ -n "$envfile" ]] && sb_mask_file "$envfile"
+
+sb_args+=(--clearenv)
+while IFS= read -r k; do sb_args+=(--setenv "$k" "${envmap[$k]}"); done < <(printf '%s\n' "${!envmap[@]}" | sort)
+sb_args+=(--chdir "$data")
+cmd=("$py" -I -B -m websearch "${fwd[@]}")
+
+if [[ $print_only -eq 1 ]]; then
+  sb_print "$bwrap_bin" "${cmd[@]}"
+  exit 0
+fi
+sb_exec "$bwrap_bin" "${cmd[@]}"

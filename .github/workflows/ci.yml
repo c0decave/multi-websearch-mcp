@@ -1,0 +1,72 @@
+# Tests (3.10-3.13) + mypy + Paket-Check bei jedem Push/PR
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: pytest (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0  # v7
+        with:
+          python-version: ${{ matrix.python-version }}
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78  # v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: requirements.lock
+      - name: Abhängigkeiten aus requirements.lock
+        run: uv pip install --system -r requirements.lock "pytest==9.2.0" "mypy==2.4.1"
+      - name: bubblewrap (für die echten Sandbox-Tests in tests/test_deploy.py)
+        run: sudo apt-get install -y --no-install-recommends bubblewrap
+      - name: pytest
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+          WEBSEARCH_TEST_BWRAP: /usr/bin/bwrap      # Argument-Test mit dem echten bwrap
+        run: python -m pytest -q -rs                # -rs: übersprungene Tests mit Grund anzeigen
+      - name: mypy
+        if: matrix.python-version == '3.12'
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+        run: mypy websearch
+
+  package:
+    name: build + install wheel
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78  # v7
+      - name: sdist + wheel bauen
+        run: uv build
+      - name: Metadaten prüfen
+        run: uvx twine check --strict dist/*
+      - name: Wheel in frischer venv installieren und starten
+        run: |
+          uv venv --python 3.12 /tmp/wheel-venv
+          VIRTUAL_ENV=/tmp/wheel-venv uv pip install dist/*.whl
+          cd /tmp
+          /tmp/wheel-venv/bin/websearch --help
+          /tmp/wheel-venv/bin/python -m websearch sources
+          # Inhaltserkennung (trafilatura + lxml_html_clean) wirklich laden - fehlte mit altem pip
+          /tmp/wheel-venv/bin/python -c "from websearch.fetch import _to_markdown; assert 'Hallo' in _to_markdown('<html><body><article><h1>Titel</h1><p>Hallo Welt, ein Absatz mit genug Text für die Erkennung.</p></article></body></html>', 'https://example.org/')[1]"
+          /tmp/wheel-venv/bin/websearch doctor --offline --json || true      # darf nie mit Traceback enden
+      - name: Mit pip 23.0 installieren (Debian 12) - Abhängigkeiten ohne Extras-Auflösung
+        run: |
+          python3 -m venv /tmp/pip23 && /tmp/pip23/bin/pip install -q "pip==23.0.1"
+          /tmp/pip23/bin/pip install -q dist/*.whl
+          /tmp/pip23/bin/python -c "import lxml_html_clean, trafilatura"

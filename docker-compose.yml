@@ -1,0 +1,120 @@
+# Selbst gehostete Metasuche + MCP-Server + Monitoring  /  self-hosted meta search + MCP server + monitoring
+#   websearch init --contact du@eure-firma.de     # .env (Secret, Kontakt, Sprache) + watches/ anlegen
+#   docker compose up -d                          # oder: podman compose up -d  (bzw. podman-compose up -d)
+# Ohne Python auf dem Host / without Python on the host: README, "Quick start" / "Schnellstart".
+# Podman als systemd-Dienste (Quadlet): deploy/podman/install.sh · ohne Container (bubblewrap): deploy/bwrap/
+# (README, "Installation")
+# SearXNG-API danach / afterwards: http://localhost:8888/search?q=test&format=json
+# Fertiges Image statt lokalem Build / prebuilt image instead of a local build:
+#   WEBSEARCH_IMAGE=ghcr.io/c0decave/web-search-mcp:0.3.0rc1 docker compose up -d --no-build
+# Ohne WEBSEARCH_IMAGE baut compose das Image lokal als websearch:local.
+x-logging: &logging
+  options: { max-size: "5m", max-file: "3" }
+
+services:
+  searxng:
+    # Standard: genau die getestete Version (SearXNG-Commit 3e95f6c vom 05.11.2026). Neuere Tags:
+    # https://hub.docker.com/r/searxng/searxng/tags - in .env SEARXNG_VERSION setzen (z.B. latest)
+    image: docker.io/searxng/searxng:${SEARXNG_VERSION:-2026.11.5-3e95f6cd2}
+    restart: unless-stopped
+    # Das Image setzt kein USER: ohne diese Zeile liefe SearXNG als root (und übereignete ./searxng auf dem
+    # Host an UID 977). Als 977 meldet der Entrypoint höchstens, /etc/searxng gehöre nicht "searxng" - harmlos.
+    user: "977:977"
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    pids_limit: 512
+    mem_limit: 1g
+    ports:
+      - "127.0.0.1:8888:8080"     # nur lokal erreichbar - NICHT ins Internet stellen (Limiter ist aus)
+    volumes:
+      - ./searxng:/etc/searxng:ro,Z   # nur lesbar; settings.yml muss für UID 977 lesbar sein (0644)
+      - searxng-cache:/var/cache/searxng
+    environment:
+      - SEARXNG_BASE_URL=http://localhost:8888/
+      - SEARXNG_SECRET=${SEARXNG_SECRET:?SEARXNG_SECRET fehlt in .env / missing in .env - run: websearch init}
+    healthcheck:
+      # Image enthält kein wget/curl -> Python aus dem SearXNG-venv nutzen
+      test: ["CMD", "/usr/local/searxng/.venv/bin/python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/healthz', timeout=4)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    logging: *logging
+
+  # MCP-Server für KI-Agents (streamable-http, http://127.0.0.1:8765/mcp; /healthz, /metrics)
+  # Fernzugriff: MCP_AUTH_TOKEN und MCP_ALLOWED_HOSTS in .env setzen (README, Abschnitt "MCP für KI-Agents")
+  websearch-mcp:
+    image: ${WEBSEARCH_IMAGE:-websearch:local}
+    build: .
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    pids_limit: 512
+    mem_limit: 1g
+    command: ["mcp", "--http"]
+    restart: unless-stopped
+    depends_on:
+      searxng: { condition: service_healthy }
+    ports:
+      - "127.0.0.1:8765:8765"
+    env_file: [{ path: .env, required: false }]
+    environment:      # hat Vorrang vor .env - Pfade immer ins Volume /data
+      - SEARXNG_URL=http://searxng:8080
+      - MCP_HOST=0.0.0.0
+      - MCP_PORT=8765
+      # Ohne MCP_AUTH_TOKEN (websearch init erzeugt eines) startet der Server nicht: im Container lauscht er auf
+      # 0.0.0.0, und andere Container im selben Netz bzw. lokale Nutzer könnten ihn sonst nutzen. Bewusst
+      # ohne Token (Port nur auf 127.0.0.1, Einzelplatzrechner): MCP_ALLOW_NO_AUTH=1 in .env.
+      - MCP_ALLOW_NO_AUTH=${MCP_ALLOW_NO_AUTH:-0}
+      - WEBSEARCH_CACHE=/data/cache.db
+    volumes: [websearch-data:/data]
+    healthcheck:
+      # /healthz braucht kein Token (MCP_AUTH_TOKEN) und liefert nur "ok"
+      test: ["CMD", "python", "-c",
+             "import urllib.request as u; u.urlopen('http://127.0.0.1:8765/healthz', timeout=4)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    logging: *logging
+
+  # Monitoring: prüft watches.json in Schleife, neue Treffer -> stdout (docker logs) + Webhook/JSONL
+  websearch-monitor:
+    image: ${WEBSEARCH_IMAGE:-websearch:local}
+    build: .
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    pids_limit: 512
+    mem_limit: 1g
+    command: ["monitor", "/config/watches.json", "--loop"]
+    restart: unless-stopped
+    depends_on:
+      searxng: { condition: service_healthy }
+    env_file: [{ path: .env, required: false }]
+    environment:      # hat Vorrang vor .env - Pfade immer ins Volume /data
+      - SEARXNG_URL=http://searxng:8080
+      - WEBSEARCH_CACHE=/data/cache.db
+      - WEBSEARCH_MONITOR_DB=/data/monitor.db
+      - WEBSEARCH_HEARTBEAT=/data/monitor.heartbeat
+    volumes:
+      # Verzeichnis statt Einzeldatei: Editoren/git ersetzen die Datei beim Speichern, ein Datei-Mount
+      # würde dann weiter auf die alte Version zeigen. Änderungen werden im laufenden Betrieb übernommen.
+      - ./watches:/config:ro,Z
+      - websearch-data:/data
+    healthcheck:
+      # Heartbeat jünger als 15 min -> Schleife läuft (ein Durchlauf darf bis zu 10 min dauern: deadline max. 600 s)
+      test: ["CMD", "python", "-c",
+             "import os,time,sys; sys.exit(time.time()-os.path.getmtime('/data/monitor.heartbeat')>900)"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 5m
+    logging: *logging
+
+volumes:
+  searxng-cache:
+  websearch-data:

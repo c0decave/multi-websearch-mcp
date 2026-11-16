@@ -1,0 +1,6 @@
+# Eigenes Netz für SearXNG + websearch (Container erreichen sich über ihren Namen)
+[Unit]
+Description=websearch network
+
+[Network]
+NetworkName=websearch

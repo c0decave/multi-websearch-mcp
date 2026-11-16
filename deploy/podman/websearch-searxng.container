@@ -1,0 +1,43 @@
+# SearXNG (Metasuche) - rootless Podman / Quadlet. Installiert von deploy/podman/install.sh
+[Unit]
+Description=SearXNG for websearch
+Wants=network-online.target
+After=network-online.target
+
+[Container]
+ContainerName=websearch-searxng
+# getesteter Stand als Standard (install.sh); SEARXNG_VERSION in .env überschreibt
+Image=docker.io/searxng/searxng:@SEARXNG_VERSION@
+Network=websearch.network
+# nur lokal erreichbar - NICHT öffentlich machen (SearXNG-Limiter ist aus)
+PublishPort=127.0.0.1:@SEARXNG_PORT@:8080
+# rootless: der eigene Nutzer erscheint im Container als UID 977 (searxng), und keep-id startet den Prozess
+# auch als diese UID - ohne das liefe das Image als root (es hat kein USER; das Entrypoint-Skript chownt dann
+# die Volumes, ruft update-ca-certificates auf und startet granian als root)
+UserNS=keep-id:uid=977,gid=977
+# Härtung: als UID 977 braucht das Entrypoint-Skript keine Capabilities (chown/CA-Update nur als root,
+# settings.yml legt es nur an, wenn sie fehlt - sie liegt im Repo). Dateisystem nur lesbar; Podman legt dafür
+# tmpfs auf /tmp, /var/tmp und /run (--read-only-tmpfs ist Standard). Schreibbar bleibt nur der Cache.
+NoNewPrivileges=true
+DropCapability=ALL
+ReadOnly=true
+# Grenzen gegen Fork-Bomben/Speicherfresser (install.sh lässt --memory weg, wenn der memory-Controller
+# nicht delegiert ist)
+PidsLimit=@PIDS@
+PodmanArgs=--memory=@MEMORY@
+# Einstellungen nur lesbar (auf dem Host in <repo>/searxng/settings.yml bearbeiten)
+Volume=@REPO@/searxng:/etc/searxng:ro,Z
+Volume=searxng-cache.volume:/var/cache/searxng
+# nur SEARXNG_SECRET (install.sh schreibt diese Datei aus .env)
+EnvironmentFile=@SXENVFILE@
+Environment=SEARXNG_BASE_URL=http://localhost:@SEARXNG_PORT@/
+HealthCmd=/usr/local/searxng/.venv/bin/python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/healthz', timeout=4)"
+HealthInterval=30s
+HealthRetries=3
+
+[Service]
+Restart=always
+TimeoutStartSec=300
+
+[Install]
+WantedBy=default.target

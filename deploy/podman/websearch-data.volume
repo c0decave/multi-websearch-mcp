@@ -1,0 +1,3 @@
+# Cache, hostweite Pausen/Tempo/Metriken und Monitoring-Zustand (/data in den websearch-Containern)
+[Volume]
+VolumeName=websearch-data

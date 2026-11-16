@@ -1,0 +1,2 @@
+# Build-Backend für 'pip install --no-build-isolation .' im Dockerfile (gepinnt in build-requirements.lock)
+hatchling>=1.27

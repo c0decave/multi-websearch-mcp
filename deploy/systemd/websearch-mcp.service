@@ -1,0 +1,16 @@
+# websearch MCP-Server (HTTP, 127.0.0.1:8765) in einer bubblewrap-Sandbox. Installiert von deploy/systemd/install.sh
+[Unit]
+Description=websearch MCP server (bubblewrap sandbox)
+Wants=websearch-searxng.service
+After=websearch-searxng.service
+
+[Service]
+# Pfade in "..." (Leerzeichen erlaubt); install.sh escapt \ " $ %
+ExecStart="@REPO@/deploy/bwrap/websearch-bwrap" mcp --http
+Environment=SEARXNG_URL=http://127.0.0.1:8888
+UMask=0077
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=default.target

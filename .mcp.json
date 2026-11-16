@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "websearch-repo": {
+      "command": ".venv/bin/python",
+      "args": ["-m", "websearch", "--env-file", ".env", "mcp"],
+      "env": { "SEARXNG_URL": "http://127.0.0.1:8888" }
+    }
+  }
+}

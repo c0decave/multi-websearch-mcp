@@ -1,0 +1,37 @@
+# websearch Monitoring: prüft watches/watches.json in Schleife (Änderungen werden live übernommen)
+[Unit]
+Description=websearch monitor
+Requires=websearch-searxng.service
+After=websearch-searxng.service
+
+[Container]
+ContainerName=websearch-monitor
+Image=@IMAGE@
+Exec=monitor /config/watches.json --loop
+Network=websearch.network
+Volume=@REPO@/watches:/config:ro,Z
+Volume=websearch-data.volume:/data
+# Härtung: läuft als UID 10001 (Image), braucht keine Capabilities; Dateisystem nur lesbar (tmpfs auf /tmp,
+# /var/tmp, /run), schreibbar nur das Volume /data
+NoNewPrivileges=true
+DropCapability=ALL
+ReadOnly=true
+# Grenzen gegen Fork-Bomben/Speicherfresser (install.sh lässt --memory weg, wenn der memory-Controller
+# nicht delegiert ist)
+PidsLimit=@PIDS@
+PodmanArgs=--memory=@MEMORY@
+EnvironmentFile=@ENVFILE@
+Environment=SEARXNG_URL=http://websearch-searxng:8080
+Environment=WEBSEARCH_CACHE=/data/cache.db
+Environment=WEBSEARCH_MONITOR_DB=/data/monitor.db
+Environment=WEBSEARCH_HEARTBEAT=/data/monitor.heartbeat
+HealthCmd=python -c "import os,time,sys; sys.exit(time.time()-os.path.getmtime('/data/monitor.heartbeat')>900)"
+HealthInterval=60s
+HealthStartPeriod=5m
+HealthRetries=3
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target

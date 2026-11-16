@@ -1,0 +1,6 @@
+[
+  {"name": "eu-ai-act", "query": "\"AI Act\" EU", "kind": "news", "every_min": 60, "n": 20},
+  {"name": "searxng-releases", "query": "SearXNG", "kind": "news", "every_min": 240,
+   "sources": ["hackernews", "google_news", "bing_rss"]},
+  {"name": "brand-web", "query": "\"Example Inc\"", "kind": "web", "every_min": 1440}
+]

@@ -1,0 +1,39 @@
+# websearch MCP-Server (streamable-http, http://127.0.0.1:8765/mcp; /healthz, /metrics)
+[Unit]
+Description=websearch MCP server
+Requires=websearch-searxng.service
+After=websearch-searxng.service
+
+[Container]
+ContainerName=websearch-mcp
+Image=@IMAGE@
+Exec=mcp --http
+Network=websearch.network
+PublishPort=127.0.0.1:@MCP_PORT@:8765
+Volume=websearch-data.volume:/data
+# Härtung: läuft als UID 10001 (Image), braucht keine Capabilities; Dateisystem nur lesbar (tmpfs auf /tmp,
+# /var/tmp, /run), schreibbar nur das Volume /data
+NoNewPrivileges=true
+DropCapability=ALL
+ReadOnly=true
+# Grenzen gegen Fork-Bomben/Speicherfresser (install.sh lässt --memory weg, wenn der memory-Controller
+# nicht delegiert ist)
+PidsLimit=@PIDS@
+PodmanArgs=--memory=@MEMORY@
+EnvironmentFile=@ENVFILE@
+# hat Vorrang vor der .env (Podman: --env nach --env-file)
+Environment=SEARXNG_URL=http://websearch-searxng:8080
+Environment=MCP_HOST=0.0.0.0
+Environment=MCP_PORT=8765
+# aus .env (Standard 0 wie bei compose): ohne MCP_AUTH_TOKEN startet der Server nur mit MCP_ALLOW_NO_AUTH=1
+Environment=MCP_ALLOW_NO_AUTH=@MCP_ALLOW_NO_AUTH@
+Environment=WEBSEARCH_CACHE=/data/cache.db
+HealthCmd=python -c "import urllib.request as u; u.urlopen('http://127.0.0.1:8765/healthz', timeout=4)"
+HealthInterval=30s
+HealthRetries=3
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target

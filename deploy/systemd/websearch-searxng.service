@@ -1,0 +1,15 @@
+# SearXNG in einer bubblewrap-Sandbox (ohne Container). Installiert von deploy/systemd/install.sh
+[Unit]
+Description=SearXNG for websearch (bubblewrap sandbox)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+ExecStart="@REPO@/deploy/bwrap/searxng-bwrap" run
+Environment="SEARXNG_SRC=@SEARXNG_SRC@"
+UMask=0077
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=default.target

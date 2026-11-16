@@ -1,0 +1,17 @@
+# websearch Monitoring in einer bubblewrap-Sandbox (watches/watches.json, Änderungen werden live übernommen).
+# Installiert von deploy/systemd/install.sh
+[Unit]
+Description=websearch monitor (bubblewrap sandbox)
+Wants=websearch-searxng.service
+After=websearch-searxng.service
+
+[Service]
+# absoluter Pfad statt WorkingDirectory: die Sandbox arbeitet im Datenverzeichnis
+ExecStart="@REPO@/deploy/bwrap/websearch-bwrap" monitor "@REPO@/watches/watches.json" --loop
+Environment=SEARXNG_URL=http://127.0.0.1:8888
+UMask=0077
+Restart=on-failure
+RestartSec=30
+
+[Install]
+WantedBy=default.target

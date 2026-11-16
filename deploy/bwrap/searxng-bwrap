@@ -1,0 +1,186 @@
+#!/usr/bin/env bash
+# SearXNG ohne Container in einer bubblewrap-Sandbox  /  SearXNG without containers, inside bubblewrap
+#
+#   deploy/bwrap/searxng-bwrap install      # einmalig: SearXNG-Quellcode + venv anlegen (braucht git, python3)
+#                                           # / once: fetch SearXNG source + create its venv
+#   deploy/bwrap/searxng-bwrap update       # auf SEARXNG_REF wechseln + Abhängigkeiten / move to SEARXNG_REF
+#   deploy/bwrap/searxng-bwrap run          # starten / start: http://127.0.0.1:8888 (Strg+C / Ctrl+C beendet)
+#   deploy/bwrap/searxng-bwrap --print run  # bwrap-Aufruf nur anzeigen / only show the bwrap call
+#                                           # (auch / also: --print install, --print update)
+#
+# Konfiguration / configuration: <repo>/searxng/settings.yml (dieselbe wie bei Docker / same as with Docker),
+# Secret aus / secret from <repo>/.env (SEARXNG_SECRET, z.B. von / e.g. from 'websearch init').
+# Umgebung / environment:
+#   SEARXNG_SRC   Quellcode-Verzeichnis / source directory (Standard / default: ~/.local/share/websearch-searxng -
+#                 bewusst NICHT im schreibbaren Datenverzeichnis von websearch-bwrap / deliberately outside the
+#                 writable data directory of websearch-bwrap; der alte Ort ~/.local/share/websearch/searxng-src
+#                 wird nur noch genutzt, wenn SEARXNG_SRC darauf zeigt / the old location is only used if
+#                 SEARXNG_SRC points to it)
+#   SEARXNG_PORT  Port (Standard / default 8888), SEARXNG_BIND (Standard / default 127.0.0.1 - NICHT öffentlich
+#                 machen / do NOT expose publicly)
+#   SEARXNG_REF   Branch, Tag oder volle Commit-ID für install/update (Standard: getesteter Commit, s.u.;
+#                 SEARXNG_REF=master für den neuesten Stand) / branch, tag or full commit id (default: the
+#                 tested commit; SEARXNG_REF=master for the latest)
+#   WEBSEARCH_BWRAP, WEBSEARCH_ENV_FILE, WEBSEARCH_BWRAP_SECCOMP, WEBSEARCH_BWRAP_DISABLE_USERNS wie bei / as for
+#   websearch-bwrap
+# Sandbox (run): alles nur lesbar, $HOME, /tmp, /var/tmp, /run und das Repo leer überlagert, eingeblendet nur
+# Quellcode und searxng/ (beides lesend); eigene Namespaces, Netz geteilt, keine Capabilities, seccomp (keine
+# Unix-Sockets), leere Umgebung (nur das Secret), Optionen per Pipe (Secret nicht in /proc/*/cmdline).
+# install/update laufen ebenfalls in bwrap: git und pip dürfen nur den Quellcode schreiben.
+# / run: read-only system, $HOME, /tmp, /run and the repo hidden; install/update: git and pip sandboxed too,
+# only the source directory is writable.
+set -euo pipefail
+
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+repo="$(cd "$here/../.." && pwd -P)"
+bwrap_bin="${WEBSEARCH_BWRAP:-bwrap}"
+share="${XDG_DATA_HOME:-$HOME/.local/share}"
+default_src="$share/websearch-searxng"
+legacy_src="$share/websearch/searxng-src"        # alter Standardort (bis 0.3): im Datenverzeichnis
+ws_data="${WEBSEARCH_DATA:-$share/websearch}"
+# getesteter Stand (SearXNG master vom 05.11.2026, Image-Tag 2026.11.5-3e95f6cd2)
+pinned_ref="3e95f6cd2a68add0329cb162907b49289e2bc1fd"
+ref="${SEARXNG_REF:-$pinned_ref}"
+port="${SEARXNG_PORT:-8888}"
+bind="${SEARXNG_BIND:-127.0.0.1}"
+envfile="${WEBSEARCH_ENV_FILE:-$repo/.env}"
+settings="$repo/searxng/settings.yml"
+print_only=0
+sb_name="searxng-bwrap"
+sb_python="python3"
+
+die() { echo "searxng-bwrap: $*" >&2; exit 2; }
+# shellcheck source=../lib/sandbox.sh
+source "$here/../lib/sandbox.sh"
+[[ "${1:-}" == "--print" ]] && { print_only=1; shift; }
+cmd="${1:-run}"
+
+# Der alte Ort im Datenverzeichnis wird nie automatisch genutzt (die websearch-Sandbox hätte dort Code
+# ablegen können) - nur, wenn SEARXNG_SRC ausdrücklich darauf zeigt
+src="${SEARXNG_SRC:-$default_src}"
+legacy_hint() {
+  [[ -z "${SEARXNG_SRC:-}" && -d "$legacy_src/.git" ]] || return 0
+  echo "searxng-bwrap: Hinweis: alte Installation in $legacy_src wird nicht mehr genutzt (lag im schreibbaren" \
+       "Datenverzeichnis der websearch-Sandbox). Neu installieren: $0 install, danach rm -rf '$legacy_src'" \
+       "/ note: the old installation is no longer used (it was writable by the websearch sandbox) - reinstall" >&2
+}
+# liegt der Quellcode im Datenverzeichnis von websearch-bwrap? Dort kann die websearch-Sandbox schreiben -
+# Code, den update/run später ausführt (websearch-bwrap blendet ihn deshalb nur lesend ein, sicherer ist
+# ein Ort außerhalb)
+in_ws_data() {
+  local d s
+  d="$(realpath -m "$ws_data")" s="$(realpath -m "$1")"
+  sb_within "$d" "$s"
+}
+warn_legacy() {
+  in_ws_data "$src" || return 0
+  echo "searxng-bwrap: Warnung: $src liegt im schreibbaren Datenverzeichnis von websearch-bwrap. Neu anlegen:" \
+       "rm -rf '$src' && $0 install   (Standard jetzt / default now: $default_src)" \
+       "/ warning: inside websearch-bwrap's writable data directory - reinstall outside it" >&2
+}
+
+need_bwrap() {
+  command -v "$bwrap_bin" >/dev/null 2>&1 \
+    || die "bwrap nicht gefunden - bubblewrap installieren / bwrap not found - install bubblewrap"
+}
+
+# install/update: Sandbox, in der nur der Quellcode schreibbar ist (git, venv, pip mit Netz)
+sandbox_rw() {
+  local s
+  s="$(realpath -m "$src")"
+  sb_detect "$bwrap_bin"
+  sb_base searxng-install
+  sb_args+=(--tmpfs "$repo" --bind "$s" "$s" --clearenv
+            --setenv PATH /usr/local/bin:/usr/bin:/bin --setenv HOME /tmp --setenv LANG C.UTF-8
+            --setenv GIT_TERMINAL_PROMPT 0 --chdir "$s")
+  for k in SSL_CERT_FILE SSL_CERT_DIR REQUESTS_CA_BUNDLE PIP_INDEX_URL HTTPS_PROXY https_proxy; do
+    [[ -n "${!k:-}" ]] && sb_args+=(--setenv "$k" "${!k}")
+  done
+  sb_mask_file "$envfile"
+  # Schritte als bash-Skript in der Sandbox; Parameter als Argumente (keine Geheimnisse)
+  if [[ $print_only -eq 1 ]]; then
+    sb_print "$bwrap_bin" bash -euc "$1" searxng-bwrap "$s" "$ref"
+    return 0
+  fi
+  sb_run "$bwrap_bin" bash -euc "$1" searxng-bwrap "$s" "$ref"
+}
+fetch_and_deps='
+src="$1" ref="$2"
+[[ -d "$src/.git" ]] || { git init -q "$src"; git -C "$src" remote add origin https://github.com/searxng/searxng.git; }
+git -C "$src" fetch -q --depth 1 origin "$ref"
+git -C "$src" checkout -q --detach FETCH_HEAD
+echo "SearXNG $(git -C "$src" rev-parse --short HEAD)"
+[[ -x "$src/.venv/bin/python" ]] || python3 -m venv "$src/.venv"
+"$src/.venv/bin/pip" install -q -U pip setuptools wheel
+"$src/.venv/bin/pip" install -q -r "$src/requirements.txt" -r "$src/requirements-server.txt"
+'
+
+case "$cmd" in
+  install)
+    [[ -d "$src/.git" ]] && die "$src gibt es schon - 'update' nutzen / already exists - use 'update'"
+    in_ws_data "$src" && die "$src liegt im schreibbaren Datenverzeichnis von websearch-bwrap ($ws_data) -" \
+                             "anderes SEARXNG_SRC wählen / is inside websearch-bwrap's writable data directory"
+    if [[ -d "$src" && -n "$(ls -A "$src")" ]]; then die "$src ist nicht leer / is not empty"; fi
+    if [[ $print_only -eq 1 ]]; then sandbox_rw "$fetch_and_deps"; exit 0; fi   # nur anzeigen
+    sb_check_root
+    command -v git >/dev/null || die "git fehlt / git missing"
+    command -v python3 >/dev/null || die "python3 fehlt / python3 missing"
+    need_bwrap
+    mkdir -p "$src"
+    sandbox_rw "$fetch_and_deps"
+    echo "SearXNG installiert in / installed in $src - starten mit / start with: $0 run"
+    legacy_hint
+    exit 0 ;;
+  update)
+    [[ -d "$src/.git" ]] || { legacy_hint; die "$src fehlt - erst 'install' / missing - run 'install' first"; }
+    warn_legacy
+    if [[ $print_only -eq 1 ]]; then sandbox_rw "$fetch_and_deps"; exit 0; fi   # nur anzeigen
+    sb_check_root
+    need_bwrap
+    sandbox_rw "$fetch_and_deps"
+    exit 0 ;;
+  run) ;;
+  -h|--help|help) sb_usage "${BASH_SOURCE[0]}"; exit 0 ;;
+  *) die "unbekannter Befehl / unknown command: $cmd (install | update | run)" ;;
+esac
+
+[[ $print_only -eq 1 ]] || sb_check_root
+[[ -x "$src/.venv/bin/granian" ]] || legacy_hint
+[[ -x "$src/.venv/bin/granian" ]] || die "SearXNG nicht installiert - erst '$0 install' / not installed - run '$0 install' first"
+[[ -f "$settings" ]] || die "$settings fehlt / missing"
+[[ $print_only -eq 1 ]] || need_bwrap
+warn_legacy
+
+# Secret aus .env lesen (ohne die Datei auszuführen, Regeln wie docker compose); gesetzte Variable gewinnt
+secret="${SEARXNG_SECRET:-}"
+if [[ -z "$secret" && -f "$envfile" ]]; then
+  command -v python3 >/dev/null || die "python3 fehlt (zum Lesen von $envfile) / python3 missing"
+  while IFS= read -r -d '' k && IFS= read -r -d '' v; do [[ "$k" == SEARXNG_SECRET ]] && secret="$v"; done \
+    < <(python3 -I "$sb_tool" env "$envfile" SEARXNG_SECRET)
+fi
+[[ -n "$secret" ]] || die "SEARXNG_SECRET fehlt (websearch init) / missing (run: websearch init)"
+
+srcreal="$(realpath "$src")"
+confdir="$(realpath "$(dirname "$settings")")"
+sb_detect "$bwrap_bin"
+sb_base searxng
+# Repo komplett leer überlagern (liegt es außerhalb von $HOME, wäre es samt .env sonst lesbar), dann nur
+# die Einstellungen und den Quellcode einblenden
+sb_args+=(--tmpfs "$repo" --ro-bind "$confdir" "$confdir" --ro-bind "$srcreal" "$srcreal")
+sb_mask_dir "$confdir"
+sb_mask_file "$envfile"
+sb_args+=(--clearenv
+          --setenv PATH "$srcreal/.venv/bin:/usr/local/bin:/usr/bin:/bin"
+          --setenv HOME /tmp --setenv LANG C.UTF-8 --setenv PYTHONDONTWRITEBYTECODE 1
+          --setenv SEARXNG_SETTINGS_PATH "$confdir/settings.yml"
+          --setenv SEARXNG_SECRET "$secret"
+          --setenv SEARXNG_BASE_URL "http://localhost:$port/"
+          --setenv GRANIAN_INTERFACE wsgi --setenv GRANIAN_HOST "$bind" --setenv GRANIAN_PORT "$port"
+          --chdir "$srcreal")
+run_cmd=("$srcreal/.venv/bin/granian" searx.webapp:app)
+
+if [[ $print_only -eq 1 ]]; then
+  sb_print "$bwrap_bin" "${run_cmd[@]}"
+  exit 0
+fi
+sb_exec "$bwrap_bin" "${run_cmd[@]}"

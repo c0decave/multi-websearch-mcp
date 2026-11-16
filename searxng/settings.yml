@@ -1,0 +1,95 @@
+# SearXNG-Konfiguration für den internen, automatisierten Zugriff (nicht öffentlich betreiben!)
+# Doku: https://docs.searxng.org/admin/settings/
+# Geprüft gegen SearXNG-Commit 3e95f6c vom 05.11.2026 (Image-Tag 2026.11.5-3e95f6cd2), inkl. Bild-/Video-Engines.
+use_default_settings:
+  engines:
+    # Nur diese Engines laden. SearXNG schickt JEDE Anfrage an alle aktiven Engines der Kategorie,
+    # also gilt: weniger Engines = weniger Last pro Engine = weniger Captchas.
+    #
+    # Bewusst NICHT enthalten:
+    #   startpage, mojeek  - upstream "inactive": nutzen seit 2026 ein Proof-of-Work-Captcha
+    #   google news, bing news - holt der Client direkt als offiziellen RSS-Feed (google_news, bing_rss),
+    #                            sonst würde jede News-Anfrage Google/Bing doppelt treffen
+    keep_only:
+      - google
+      - bing
+      - duckduckgo
+      - brave
+      - qwant
+      - wikipedia
+      - wikidata
+      - github
+      - stackoverflow
+      - arxiv
+      - duckduckgo news
+      - qwant news
+      - brave.news
+      # Bilder (websearch -k images)
+      - bing images
+      - duckduckgo images
+      - brave.images
+      - qwant images
+      - wikicommons.images
+      # Videos (websearch -k videos)
+      - youtube
+      - google videos
+      - bing videos
+      - duckduckgo videos
+      - brave.videos
+
+general:
+  instance_name: "websearch-intern"
+  enable_metrics: true          # /stats zeigt Fehler/Suspendierungen pro Engine
+
+server:
+  # Wird per Umgebungsvariable SEARXNG_SECRET überschrieben
+  secret_key: "change-me-via-SEARXNG_SECRET"
+  limiter: false                # interner Dienst: kein Bot-Schutz gegen uns selbst
+  public_instance: false
+  image_proxy: false
+
+search:
+  safe_search: 1                # moderat: keine expliziten Inhalte (wichtig für Bild-/Videosuche durch Agents)
+  autocomplete: ""
+  default_lang: "auto"
+  formats:
+    - html
+    - json                      # Pflicht für API-Zugriff: /search?q=...&format=json
+  # Suspendierung nach Fehlern: Engine wird pausiert statt weiter gegen die Wand zu laufen.
+  # Werte = Upstream-Standard (settings_defaults.py). Bewusst lang: früheres Wiederholen
+  # verlängert IP-Sperren meist nur.
+  suspended_times:
+    SearxEngineAccessDenied: 86400
+    SearxEngineCaptcha: 86400
+    SearxEngineTooManyRequests: 3600
+    cf_SearxEngineCaptcha: 1296000
+    cf_SearxEngineAccessDenied: 86400
+    recaptcha_SearxEngineCaptcha: 604800
+
+outgoing:
+  request_timeout: 4.0
+  max_request_timeout: 8.0
+  pool_connections: 100
+  pool_maxsize: 20
+  enable_http2: true
+  # Optional: ausgehende IPs rotieren, falls der Host mehrere IPv4/IPv6-Adressen hat
+  # source_ips:
+  #   - 192.0.2.10
+  #   - 2001:db8::/64      # ganzes IPv6-/64 -> zufällige Quelladresse pro Request
+  # Optional: Tor als zusätzlicher (langsamer) Ausweichweg - viele Engines blocken Tor-Exits
+  # proxies:
+  #   all://:
+  #     - socks5h://tor:9050
+
+engines:
+  # Upstream liefert diese deaktiviert aus - hier bewusst aktivieren
+  - name: google
+    disabled: false
+  - name: bing
+    disabled: false
+  - name: qwant
+    disabled: false
+  - name: qwant news
+    disabled: false
+  - name: qwant images
+    disabled: false
