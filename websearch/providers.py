@@ -35,7 +35,9 @@ BROWSER_UA = "Mozilla/5.0 (X11; Linux x86_64; rv:140.0) Gecko/20100101 Firefox/1
 def bot_ua() -> str:
     """Wikimedia/GDELT/HN wollen einen ehrlichen User-Agent mit Kontakt (WEBSEARCH_UA)."""
     from . import __version__
-    return os.environ.get("WEBSEARCH_UA", f"websearch/{__version__} (+https://example.invalid/contact)")
+    # leer gesetzt (z.B. ein nicht ausgefülltes Feld im Docker MCP Toolkit) zählt wie nicht gesetzt
+    return (os.environ.get("WEBSEARCH_UA", "").strip()
+            or f"websearch/{__version__} (+https://example.invalid/contact)")
 
 
 # Nur in HTML-Antworten suchen: In JSON/RSS können diese Wörter ganz normal in Treffern stehen

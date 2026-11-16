@@ -144,3 +144,11 @@ def test_server_json_matches_package_version():
     assert {d["version"]} | {p["version"] for p in d["packages"]} == {__version__}
     readme = (Path(__file__).resolve().parent.parent / "README.md").read_text(encoding="utf-8")
     assert f"mcp-name: {d['name']}" in readme                     # Eigentumsnachweis für die Registry
+
+
+def test_bot_ua_empty_env_falls_back(monkeypatch):
+    from websearch.providers import bot_ua
+    monkeypatch.setenv("WEBSEARCH_UA", "  ")
+    assert bot_ua().startswith("websearch/")
+    monkeypatch.setenv("WEBSEARCH_UA", "x/1 (a@b.example)")
+    assert bot_ua() == "x/1 (a@b.example)"

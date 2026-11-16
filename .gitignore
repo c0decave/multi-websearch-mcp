@@ -13,3 +13,6 @@ dist/
 build/
 # lokale Claude-Code-Sitzungsdaten (Locks, Einstellungen)
 .claude/
+
+# interne Notizen, nie veröffentlichen
+private/

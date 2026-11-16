@@ -4,6 +4,16 @@ All notable changes to this project. Versions follow [PEP 440](https://peps.pyth
 (`0.3.0rc1` = release candidate 1 of 0.3.0). The release workflow uses each version's section as the text of its
 GitHub release.
 
+## [Unreleased]
+
+### Added
+- Logo (`docs/assets/logo.png`), `llms-install.md` with setup steps for AI agents (Cline, Claude Code …),
+  MCP Registry badge.
+
+### Fixed
+- An empty `WEBSEARCH_UA` (e.g. an unfilled field in the Docker MCP Toolkit) now falls back to the default
+  User-Agent instead of sending an empty one.
+
 ## [0.3.0rc2] – 2026-11-16
 
 Second pre-release, first one on PyPI.
