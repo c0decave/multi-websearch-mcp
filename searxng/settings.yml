@@ -38,7 +38,7 @@ use_default_settings:
       - brave.videos
 
 general:
-  instance_name: "websearch-intern"
+  instance_name: "websearch"
   enable_metrics: true          # /stats zeigt Fehler/Suspendierungen pro Engine
 
 server:

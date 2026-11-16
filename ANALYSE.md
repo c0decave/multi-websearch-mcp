@@ -1,7 +1,7 @@
 # Automatisierter Zugriff auf Suchmaschinen: Analyse und Empfehlung
 
-Stand: 05.11.2026 · Rahmen: kostenlose Dienste als Basis (günstige Bezahl-APIs optional als Reserve), voll automatisiert, parallel, möglichst ohne Captchas
-Anwendungsfälle: KI-Agent-Recherche und Monitoring/Alerts, ca. 100–2.000 Anfragen pro Tag, Docker/Server erlaubt
+Stand: 05.11.2026 · Ziel: kostenlose Dienste als Basis (günstige Bezahl-APIs optional als Reserve), voll automatisiert, parallel, möglichst ohne Captchas
+Ausgelegt für: KI-Agent-Recherche und Monitoring/Alerts mit ca. 100–2.000 Anfragen pro Tag, Betrieb mit Docker oder auf einem eigenen Server
 
 ---
 
@@ -30,24 +30,24 @@ Anwendungsfälle: KI-Agent-Recherche und Monitoring/Alerts, ca. 100–2.000 Anfr
 
 ### 2.1 Suchmaschinen im Überblick
 
-Viele „Suchmaschinen“ haben gar keinen eigenen Index, sondern zeigen Ergebnisse von Bing oder Google. Für die Automatisierung zählt deshalb, **welcher Index** dahintersteht und **über welchen Weg** man ihn erreicht. Stand: 05.11.2026. SearXNG-Status aus `searx/settings.yml` (Commit 3e95f6c), `ddgs`-Backends aus `ddgs.engines.ENGINES` (v9.16.1). „Unser Setup“ meint `searxng/settings.yml` bzw. `websearch`.
+Viele „Suchmaschinen“ haben gar keinen eigenen Index, sondern zeigen Ergebnisse von Bing oder Google. Für die Automatisierung zählt deshalb, **welcher Index** dahintersteht und **über welchen Weg** man ihn erreicht. Stand: 05.11.2026. SearXNG-Status aus `searx/settings.yml` (Commit 3e95f6c), `ddgs`-Backends aus `ddgs.engines.ENGINES` (v9.16.1). „websearch“ meint die mitgelieferte `searxng/settings.yml` bzw. das Tool.
 
-| Suchmaschine | Index | Offizielle API (Nov. 2026) | SearXNG-Engine (upstream) | `ddgs` | Bewertung für uns |
+| Suchmaschine | Index | Offizielle API (Nov. 2026) | SearXNG-Engine (upstream) | `ddgs` | Bewertung |
 |---|---|---|---|---|---|
-| **Google** | eigener | Custom Search JSON API: keine Neukunden, Ende 01.01.2027. Indirekt: Serper (2.500 gratis, ab 1 $/1k), SerpApi (250/Monat gratis) | `google`: disabled, bei uns **aktiv** | deaktiviert | über SearXNG; empfindlichste Engine, Reserve: Serper |
-| **Bing** | eigener | Web Search API abgeschaltet 11.08.2025 | `bing`: disabled, bei uns **aktiv** | Text deaktiviert (nur News/Bilder) | über SearXNG + **Bing-RSS** (`bing_rss`) |
+| **Google** | eigener | Custom Search JSON API: keine Neukunden, Ende 01.01.2027. Indirekt: Serper (2.500 gratis, ab 1 $/1k), SerpApi (250/Monat gratis) | `google`: disabled, in websearch **aktiv** | deaktiviert | über SearXNG; empfindlichste Engine, Reserve: Serper |
+| **Bing** | eigener | Web Search API abgeschaltet 11.08.2025 | `bing`: disabled, in websearch **aktiv** | Text deaktiviert (nur News/Bilder) | über SearXNG + **Bing-RSS** (`bing_rss`) |
 | **Brave** | eigener | Brave Search API: 5 $/1k, 5 $ Gratisguthaben/Monat, Karte nötig | `brave`, `brave.news`: aktiv; `braveapi` (mit Key) vorhanden | ✅ | über SearXNG; Reserve `brave_api` |
 | **DuckDuckGo** | Bing + eigene Quellen | keine Websuch-API (nur Instant Answers) | `duckduckgo`, `duckduckgo news`: aktiv | ✅ | über SearXNG; direkt oft 202-Captcha |
 | **Yahoo** | Bing | keine | `yahoo`: disabled | ✅ | nur Fallback `ddgs:yahoo` (schwankend) |
 | **Ecosia** | Bing (+ Google) | keine | keine Engine | – | kein eigener Index → über Bing abgedeckt |
 | **Startpage** | Google | keine | `startpage`: **inactive** (Proof-of-Work-Captcha) | ✅ (aber PoW) | nicht nutzbar; Google direkt bzw. Serper |
-| **Qwant** | eigener (EU) + Bing | keine öffentliche | `qwant`, `qwant news`: disabled, bei uns **aktiv** | – | über SearXNG; gut für DE/EU |
+| **Qwant** | eigener (EU) + Bing | keine öffentliche | `qwant`, `qwant news`: disabled, in websearch **aktiv** | – | über SearXNG; gut für DE/EU |
 | **Mojeek** | eigener (UK) | ab 2 £/1k (Gratisguthaben, Karte nötig) | `mojeek`: **inactive** (PoW) | ✅ (aber PoW) | Scraping tot; API optional |
 | **Yandex** | eigener (RU) | Yandex Cloud Search API: ca. 480 ₽ (≈ 4 $)/1k, Tageslimits | `yandex`: disabled; `yandex api`: inactive | – | nur für russischsprachige Recherche |
 | **Baidu** | eigener (CN) | keine offene internationale Web-API | `baidu`: disabled | – | nur für chinesische Recherche |
 | **Seznam** | eigener (CZ) | keine | `seznam`: disabled | – | nur für tschechische Recherche |
 | **Naver** | eigener (KR) | Naver Search API (Kontingent, laut Dritt-Quellen kostenlos; 2026 Umzug auf NAVER API HUB) | `naver`, `naver news`: disabled | – | nur für koreanische Recherche |
-| **Kagi** | eigener + Mix | Search API 12 $/1k | `kagi` (mit Key), auskommentiert | – | zu teuer für unser Volumen |
+| **Kagi** | eigener + Mix | Search API 12 $/1k | `kagi` (mit Key), auskommentiert | – | zu teuer als Reserve bei 100–2.000 Anfragen pro Tag |
 | **You.com** | eigener | Web Search API 5 $/1k; MCP-Server mit Gratis-Profil | keine | – | Alternative zu Brave als Reserve |
 | **Perplexity** | eigener | Search API 5 $/1k, „Fast Search“ **1 $/1k**, bis 5 Anfragen pro Request | keine | – | **günstigste Bezahl-Reserve** (Abschnitt 7) |
 | **Exa** | eigener (semantisch) | ab 4 $/1k, **10 $ Gratisguthaben jeden Monat** ohne Karte | `exaapi` (mit Key): inactive | – | gut für Agent-Recherche, Gratiskontingent |
@@ -95,9 +95,9 @@ Jede zusätzliche Engine bekommt **jede** Anfrage der Kategorie. Regionale Engin
 | **`ddgs`** (Python, v9.16) | fragt einzelne Engines direkt ab, mit Browser-TLS-Fingerprint (primp) | ✅ zweites Standbein (nur Fallback), Details unten |
 | Headless-Browser (Playwright, Playwright-MCP) | echte Browser-Sitzung | ⚠️ nur für Einzelseiten, die JavaScript brauchen; zum Suchen zu langsam und zu auffällig |
 
-**SearXNG: Engine-Stand upstream (Nov. 2026) und unsere Konfiguration**
+**SearXNG: Engine-Stand upstream (Nov. 2026) und die Konfiguration von websearch**
 
-| Engine | Upstream | Unsere `searxng/settings.yml` |
+| Engine | Upstream | `searxng/settings.yml` von websearch |
 |---|---|---|
 | Google, Bing | `disabled: true` | bewusst aktiviert |
 | Qwant, Qwant News | `disabled: true` | bewusst aktiviert |
@@ -145,7 +145,7 @@ Für Claude Code liegt eine `.mcp.json` im Repo. Der relative Pfad `.venv/bin/py
 
 Suchmaschinen bewerten jede Anfrage nach diesen Signalen (wichtigste zuerst):
 
-1. **IP-Reputation.** Rechenzentrums- und Cloud-IPs (AWS, Hetzner, Sandbox-Umgebungen) gelten von vornherein als verdächtig. **Das ist der größte Einzelfaktor** (siehe Messung unten).
+1. **IP-Reputation.** Rechenzentrums- und Cloud-IPs (AWS, Hetzner, Cloud-Entwicklungsumgebungen) gelten von vornherein als verdächtig. **Das ist der größte Einzelfaktor** (siehe Messung unten).
 2. **Rate pro IP und pro Engine:** Spitzen, gleichmäßige Maschinentakte, viele Anfragen hintereinander.
 3. **Client-Fingerprint:** TLS/JA3, HTTP/2-Einstellungen, Header-Reihenfolge, fehlende Cookies und fehlendes JavaScript.
 4. **Aktive Abwehr:** Proof-of-Work- und JavaScript-Challenges (Startpage, Mojeek, Cloudflare). Dagegen hilft weder eine saubere IP noch ein gutes Tempo, nur der Verzicht auf diese Engines.
@@ -199,7 +199,7 @@ Preise Stand 05.11.2026 (✓ = auf der Anbieterseite geprüft, (D) = nur Dritt-Q
 - **Datenschutz:** Der Proxy-Betreiber sieht Ziel, Zeitpunkt und bei HTTP auch Inhalte; Suchbegriffe können vertraulich sein. HTTPS schützt den Inhalt, nicht die Ziel-Domain. Anbieter mit Sitz und Verarbeitung in der EU bzw. AV-Vertrag bevorzugen.
 - **Herkunft prüfen:** Bei residential Proxys nur Anbieter, die die Beschaffung offenlegen (eigene Apps mit klarer Einwilligung, Vergütung der Teilnehmer) – Marketingangaben wie „100 % ethisch“ allein reichen nicht.
 
-**Was kosten ca. 5 $ im Monat?** Eine Ergebnisseite kostet über den Proxy grob 50–150 KB Verkehr (komprimierte HTML-Seite plus TLS; gemessen in der Sandbox: Bing-Ergebnisseite 128 KB unkomprimiert, DuckDuckGo-HTML 14 KB). Mit ca. 100 KB pro Anfrage:
+**Was kosten ca. 5 $ im Monat?** Eine Ergebnisseite kostet über den Proxy grob 50–150 KB Verkehr (komprimierte HTML-Seite plus TLS; gemessen in der Testumgebung: Bing-Ergebnisseite 128 KB unkomprimiert, DuckDuckGo-HTML 14 KB). Mit ca. 100 KB pro Anfrage:
 
 | Budget / Angebot | Volumen | Anfragen pro Monat |
 |---|---|---|
@@ -226,9 +226,9 @@ Wichtig: Durch den Proxy laufen nur die **gescrapten** Anfragen, und auch nur f�
 
 ---
 
-## 4. Messung in dieser Umgebung (Rechenzentrums-IP, 05.11.2026)
+## 4. Messung von einer Rechenzentrums-IP (05.11.2026)
 
-Bewusst ein „Worst Case“: Die Sandbox läuft hinter einer Rechenzentrums-IP. Ergebnisse direkter Anfragen:
+Bewusst ein „Worst Case“: Die Testumgebung lief hinter einer Rechenzentrums-IP. Ergebnisse direkter Anfragen:
 
 | Quelle | Ergebnis |
 |---|---|
@@ -241,13 +241,13 @@ Bewusst ein „Worst Case“: Die Sandbox läuft hinter einer Rechenzentrums-IP.
 | Yahoo über ddgs | ⚠️ schwankend (zeitweise HTTP 500) |
 | Google News RSS, Bing News RSS | ✅ |
 | Hacker News API, Wikipedia API | ✅ |
-| GDELT | ❌ 429. Die geteilte Sandbox-IP war bereits über dem Limit (1 Anfrage / 5 s pro IP) |
+| GDELT | ❌ 429. Die geteilte Rechenzentrums-IP war bereits über dem Limit (1 Anfrage / 5 s pro IP) |
 | Marginalia (Key `public`) | ❌ „QPM Limit Exceeded“ bzw. 429. Der geteilte Key ist ausgeschöpft, daher eigenen Key beantragen |
 | Reddit JSON | ❌ 403 ohne OAuth (deshalb nutzt das Tool die offizielle OAuth-API) |
 
 **Ergebnis der Pipeline trotz dieser Sperren:** siehe Abschnitt 10, Teststand.
 
-Von einer Büro- oder Heim-IP sind Google (über SearXNG) und DuckDuckGo normalerweise erreichbar. **Das ist hier nicht gemessen** und sollte beim Pilotbetrieb als Erstes geprüft werden (`websearch status` bzw. `http://localhost:8888/stats`). Startpage und Mojeek bleiben auch dort hinter dem Proof-of-Work-Captcha.
+Von einer Büro- oder Heim-IP sind Google (über SearXNG) und DuckDuckGo normalerweise erreichbar. **Das ist hier nicht gemessen** und sollte im eigenen Betrieb als Erstes geprüft werden (`websearch status` bzw. `http://localhost:8888/stats`). Startpage und Mojeek bleiben auch dort hinter dem Proof-of-Work-Captcha.
 
 ---
 
@@ -435,9 +435,9 @@ Tests: siehe Abschnitt 10, Teststand.
 
 ## 10. Teststand
 
-Stand 06.11.2026, Sandbox mit Rechenzentrums-IP, SearXNG master lokal mit granian wie im offiziellen Image, Konfiguration aus `searxng/settings.yml`. Der Code wurde in mehreren Runden von unabhängigen Reviewern (Architektur, Robustheit/Sicherheit, Bedienung) geprüft; die gefundenen Punkte sind umgesetzt und mit Tests abgesichert.
+Stand 06.11.2026, Testumgebung mit Rechenzentrums-IP, SearXNG master lokal mit granian wie im offiziellen Image, Konfiguration aus `searxng/settings.yml`. Der Code wurde in mehreren Runden von unabhängigen Reviewern (Architektur, Robustheit/Sicherheit, Bedienung) geprüft; die gefundenen Punkte sind umgesetzt und mit Tests abgesichert.
 
-**Offline-Tests (`python -m pytest`): 677 grün, 2 übersprungen** (echte bwrap-Sandbox – hier fehlen User-Namespaces, siehe unten), unter Python 3.10 und 3.13 jeweils gegen das installierte Wheel. `mypy websearch` (mit `check_untyped_defs`): keine Fehler. Wheel und sdist bauen (`uv build`); der Installationsweg des Dockerfiles (gepinnte Abhängigkeiten aus `requirements.lock`, gepinntes Build-Backend aus `build-requirements.lock`, ohne Build-Isolation) ist in einer frischen Python-3.12-Umgebung geprüft.
+**Offline-Tests (`python -m pytest`): 677 grün, 2 übersprungen** (echte bwrap-Sandbox – in der Testumgebung fehlen User-Namespaces, siehe unten), unter Python 3.10 und 3.13 jeweils gegen das installierte Wheel. `mypy websearch` (mit `check_untyped_defs`): keine Fehler. Wheel und sdist bauen (`uv build`); der Installationsweg des Dockerfiles (gepinnte Abhängigkeiten aus `requirements.lock`, gepinntes Build-Backend aus `build-requirements.lock`, ohne Build-Isolation) ist in einer frischen Python-3.12-Umgebung geprüft.
 
 | Testdatei | deckt ab |
 |---|---|
@@ -473,21 +473,20 @@ Stand 06.11.2026, Sandbox mit Rechenzentrums-IP, SearXNG master lokal mit grania
 **Härtung:** Container (compose und Quadlet) ohne Capabilities, mit `no-new-privileges` und nur lesbarem Dateisystem, SearXNG als UID 977 statt root mit nur lesbarer Konfiguration; SearXNG-Image und -Commit sowie alle GitHub-Actions (per SHA) und das Build-Backend sind auf geprüfte Versionen festgelegt.
 
 **Nicht getestet:**
-- **Container und Sandboxen wirklich starten:** Die Sandbox hat weder Docker noch Podman, und Namespaces sind gesperrt (auch bwrap kann keine anlegen). Geprüft sind YAML/Units, Befehle, Dateirechte und der Paketbau; die echten Starts sollten beim Pilotbetrieb als Erstes passieren.
+- **Container und Sandboxen wirklich starten:** Die Testumgebung hatte weder Docker noch Podman, und Namespaces waren gesperrt (auch bwrap konnte keine anlegen). Geprüft sind YAML/Units, Befehle, Dateirechte und der Paketbau; die echten Starts sollten im eigenen Betrieb als Erstes passieren.
 - **Bezahl-APIs, Reddit, Discord/Teams/Telegram/SMTP live:** Es gibt keine Zugangsdaten. Formate und Fehlerfälle sind gegen nachgebaute Antworten nach Anbieter-Doku getestet.
 - **Betrieb von einer Büro- oder Heim-IP.**
 
 ---
 
-## 11. Nächste Schritte
+## 11. Empfohlene erste Schritte im eigenen Betrieb
 
-1. Auf einem Rechner im Büro- oder Heimnetz `docker compose up -d` ausführen und eine Woche Pilotbetrieb machen. Dabei `/stats` von SearXNG und `websearch status` beobachten.
+1. Auf einem Rechner im Büro- oder Heimnetz `docker compose up -d` ausführen und eine Woche Probebetrieb machen. Dabei `/stats` von SearXNG und `websearch status` beobachten.
 2. Einen eigenen Marginalia-Key per Mail beantragen und eine Kontaktadresse in `WEBSEARCH_UA` eintragen.
-3. Die Takte (`min_interval`) anhand der Pilotdaten feinjustieren. Wird Google oft gesperrt, ggf. `SERPER_API_KEY` als Reserve setzen.
-4. Für Reddit eine kostenlose „script“-App anlegen (README, Abschnitt „Quellen“) und prüfen, ob Reddit von der Büro-IP aus antwortet.
+3. Die Takte (`min_interval`) anhand der eigenen Daten feinjustieren. Wird Google oft gesperrt, ggf. `SERPER_API_KEY` als Reserve setzen.
+4. Für Reddit eine kostenlose „script“-App anlegen (README, Abschnitt „Quellen“) und prüfen, ob Reddit von der eigenen IP aus antwortet.
 5. Prometheus `/metrics` einbinden und Alarme auf `websearch_source_blocked{source="searxng"}` und die Bezahl-Zähler setzen.
-6. Nach dem ersten Git-Tag: Trusted Publisher auf PyPI und das ghcr-Paket freischalten (README, Abschnitt „Release“).
-7. Bis spätestens 01.01.2027: Alles, was intern noch an der Google Custom Search API hängt, auf diese Lösung umstellen.
+6. Wer noch die Google Custom Search JSON API nutzt: vor deren Ende am 01.01.2027 umstellen.
 
 ---
 
