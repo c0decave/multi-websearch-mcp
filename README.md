@@ -1,9 +1,12 @@
+<img src="https://raw.githubusercontent.com/c0decave/multi-websearch-mcp/main/docs/assets/logo.png" alt="" width="72" align="right">
+
 # websearch – web search MCP server that avoids captchas
 
 [![CI](https://github.com/c0decave/multi-websearch-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/c0decave/multi-websearch-mcp/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/multi-websearch-mcp?include_prereleases&label=PyPI)](https://pypi.org/project/multi-websearch-mcp/)
 [![Python](https://img.shields.io/badge/python-3.10%E2%80%933.13-blue)](pyproject.toml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+[![MCP Registry](https://img.shields.io/badge/MCP_Registry-io.github.c0decave%2Fmulti--websearch--mcp-6E56CF)](https://registry.modelcontextprotocol.io/v0/servers?search=io.github.c0decave/multi-websearch-mcp)
 
 <!-- mcp-name: io.github.c0decave/multi-websearch-mcp -->
 
