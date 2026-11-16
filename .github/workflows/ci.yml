@@ -38,7 +38,22 @@ jobs:
         env:
           PYTHONPATH: ${{ github.workspace }}
           WEBSEARCH_TEST_BWRAP: /usr/bin/bwrap      # Argument-Test mit dem echten bwrap
-        run: python -m pytest -q -rs                # -rs: übersprungene Tests mit Grund anzeigen
+        run: python -m pytest -q -rs --junitxml=junit.xml   # -rs: übersprungene Tests mit Grund anzeigen
+      - name: Fehlgeschlagene Tests als Annotationen (auch per API lesbar)
+        if: failure()
+        run: |
+          python - <<'PY'
+          import os, xml.etree.ElementTree as ET
+          if not os.path.exists("junit.xml"):
+              raise SystemExit(0)
+          esc = lambda t: t.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+          for case in ET.parse("junit.xml").iter("testcase"):
+              for bad in list(case.iter("failure")) + list(case.iter("error")):
+                  name = f'{case.get("classname")}::{case.get("name")}'
+                  text = ((bad.get("message") or "") + "\n" + (bad.text or ""))[-3000:]
+                  title = esc(name).replace(":", "%3A").replace(",", "%2C")
+                  print(f"::error title={title}::{esc(text)}")
+          PY
       - name: mypy
         if: matrix.python-version == '3.12'
         env:
@@ -67,6 +82,7 @@ jobs:
           /tmp/wheel-venv/bin/websearch doctor --offline --json || true      # darf nie mit Traceback enden
       - name: Mit pip 23.0 installieren (Debian 12) - Abhängigkeiten ohne Extras-Auflösung
         run: |
-          python3 -m venv /tmp/pip23 && /tmp/pip23/bin/pip install -q "pip==23.0.1"
+          # Debian 12 = Python 3.11 + pip 23.0; pip 23.0 läuft nicht auf Python >= 3.12 (Runner-Standard)
+          uv venv --seed --python 3.11 /tmp/pip23 && /tmp/pip23/bin/python -m pip install -q "pip==23.0.1"
           /tmp/pip23/bin/pip install -q dist/*.whl
           /tmp/pip23/bin/python -c "import lxml_html_clean, trafilatura"

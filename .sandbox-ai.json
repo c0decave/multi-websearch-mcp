@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "agent": "claude",
+  "options": [
+    "--allow-pypi",
+    "--allow-github",
+    "--dns",
+    "--allow-host",
+    "api.github.com",
+    "--allow-host",
+    "codeload.github.com",
+    "--allow-host",
+    "files.pythonhosted.org",
+    "--allow-host",
+    "github.com",
+    "--allow-host",
+    "objects.githubusercontent.com",
+    "--allow-host",
+    "pypi.org",
+    "--allow-host",
+    "raw.githubusercontent.com",
+    "--allow-host",
+    "release-assets.githubusercontent.com"
+  ]
+}
