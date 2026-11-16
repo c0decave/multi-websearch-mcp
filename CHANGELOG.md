@@ -4,6 +4,30 @@ All notable changes to this project. Versions follow [PEP 440](https://peps.pyth
 (`0.3.0rc1` = release candidate 1 of 0.3.0). The release workflow uses each version's section as the text of its
 GitHub release.
 
+## [0.3.0rc2] – 2026-11-16
+
+Second pre-release, first one on PyPI.
+
+### Changed
+
+- **New names:** the PyPI package is now **`multi-websearch-mcp`** (PyPI refused `websearch-mcp` as too similar
+  to an existing project), the repository is **`c0decave/multi-websearch-mcp`** (old links redirect) and the
+  Docker image is **`ghcr.io/c0decave/multi-websearch-mcp`**. The CLI command stays `websearch`.
+- The command that starts the MCP server directly is now `multi-websearch-mcp`, so
+  `uvx multi-websearch-mcp@0.3.0rc2` works without further arguments.
+- MCP Registry name: `io.github.c0decave/multi-websearch-mcp`.
+
+### Added
+
+- Releases publish `server.json` to the official MCP Registry automatically (after PyPI, login via GitHub OIDC).
+- Workflow "Publish existing release" to repeat the PyPI and registry steps for a release.
+
+### Fixed
+
+- CI: tests now install the package itself (the bubblewrap wrapper starts without `PYTHONPATH`), the pip 23.0
+  check runs on Python 3.11 like Debian 12, failed tests appear as annotations, and two tests no longer depend
+  on DNS or the host's cgroup setup.
+
 ## [0.3.0rc1] – 2026-11-16
 
 First public pre-release.

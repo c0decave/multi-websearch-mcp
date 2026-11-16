@@ -2,8 +2,8 @@
 
 **Deutsch** · [English](README.md) · [Quickstart (EN)](docs/QUICKSTART.md) · [Changelog](CHANGELOG.md)
 
-> **Vorabversion 0.3.0rc1:** Funktionsumfang komplett, aber noch im Pilotbetrieb. Fehler und Wünsche bitte als
-> [Issue](https://github.com/c0decave/web-search-mcp/issues) melden.
+> **Vorabversion 0.3.0rc2:** Funktionsumfang komplett, aber noch im Pilotbetrieb. Fehler und Wünsche bitte als
+> [Issue](https://github.com/c0decave/multi-websearch-mcp/issues) melden.
 
 Kostenlose Quellen als Rückgrat (selbst gehostetes SearXNG, offizielle Feeds und APIs), optional günstige
 Bezahl-APIs als Reserve. Mit Kommandozeile, Python-API, MCP-Server für KI-Agents (Web-, News-, Bild- und
@@ -78,8 +78,8 @@ docker compose logs -f websearch-monitor    # neue Treffer (JSON-Zeilen) und Mel
   als UID 977 statt root und bindet `searxng/` nur lesend ein (die Datei bleibt auf dem Host ganz normal
   editierbar). Wer von einer älteren Version kommt, deren SearXNG `./searxng` schon übereignet hat:
   einmal `sudo chown -R "$USER" searxng`.
-- Fertiges Image statt lokalem Build ([Releases](https://github.com/c0decave/web-search-mcp/releases)):
-  `WEBSEARCH_IMAGE=ghcr.io/c0decave/web-search-mcp:0.3.0rc1` in `.env`, dann
+- Fertiges Image statt lokalem Build ([Releases](https://github.com/c0decave/multi-websearch-mcp/releases)):
+  `WEBSEARCH_IMAGE=ghcr.io/c0decave/multi-websearch-mcp:0.3.0rc2` in `.env`, dann
   `docker compose pull && docker compose up -d --no-build` (linux/amd64 und linux/arm64).
 - Update: `git pull && docker compose build && docker compose pull --ignore-buildable && docker compose up -d`.
   Das SearXNG-Image ist auf die getestete Version festgelegt (`SEARXNG_VERSION` in `.env`, z.B. `latest`).
@@ -167,7 +167,7 @@ Strg+C beenden und den Befehl neu starten. Änderungen an `watches.json` überni
 ### Mit pip (ohne Docker)
 
 ```bash
-pip install websearch-mcp                   # Paketname auf PyPI (sobald veröffentlicht); Befehl: websearch
+pip install --pre multi-websearch-mcp       # Paketname auf PyPI (--pre, solange Vorabversion); Befehl: websearch
 # oder aus dem Repo: python3 -m venv .venv && . .venv/bin/activate && pip install -e '.[dev]'
 export SEARXNG_URL=http://127.0.0.1:8888    # eigene SearXNG-Instanz; ohne sie laufen die übrigen Quellen
 set -a; . ./.env; set +a                    # optional: eigene .env laden (API-Keys, Webhook, ...)
@@ -245,8 +245,8 @@ T=$(/pfad/zum/repo/.venv/bin/python -m websearch.envfile --get MCP_AUTH_TOKEN /p
   claude mcp add -s user --transport http websearch http://127.0.0.1:8765/mcp --header "Authorization: Bearer $T"
 # stdio in der bubblewrap-Sandbox
 claude mcp add -s user websearch -- /pfad/zum/repo/deploy/bwrap/websearch-bwrap mcp
-# stdio aus PyPI (sobald veröffentlicht)
-claude mcp add -s user websearch -- uvx --from websearch-mcp websearch --env-file /pfad/zur/.env mcp
+# stdio aus PyPI (kein Klonen nötig; Version festlegen, solange es eine Vorabversion ist)
+claude mcp add -s user websearch -- uvx multi-websearch-mcp@0.3.0rc2 --env-file /pfad/zur/.env
 ```
 
 Einen Eintrag ändern (anderes Token, stdio statt HTTP): erst `claude mcp remove -s user websearch`, dann neu
@@ -591,9 +591,9 @@ CI (`.github/workflows/ci.yml`): pytest auf Python 3.10–3.13 mit `requirements
 2. Bei geänderten Abhängigkeiten: `uv pip compile pyproject.toml --universal --python-version 3.10 -o requirements.lock`.
 3. Abschnitt in `CHANGELOG.md` ergänzen (`## [X.Y.Z] – Datum`; er wird zum Text des GitHub-Releases).
 4. `git tag vX.Y.Z && git push origin vX.Y.Z` – `.github/workflows/release.yml` prüft Tag und Version, testet,
-   veröffentlicht auf PyPI (Trusted Publishing, Paket `websearch-mcp`), das Multi-Arch-Image nach
-   `ghcr.io/c0decave/web-search-mcp` und legt das GitHub-Release an. Versionen mit `a`, `b` oder `rc`
-   (z.B. `0.3.0rc1`) werden als Vorabversion markiert: kein `latest`-Image, pip installiert sie nur mit `--pre`.
+   veröffentlicht auf PyPI (Trusted Publishing, Paket `multi-websearch-mcp`), das Multi-Arch-Image nach
+   `ghcr.io/c0decave/multi-websearch-mcp` und legt das GitHub-Release an. Versionen mit `a`, `b` oder `rc`
+   (z.B. `0.3.0rc2`) werden als Vorabversion markiert: kein `latest`-Image, pip installiert sie nur mit `--pre`.
    Nach PyPI trägt der Job `mcp-registry` `server.json` in die offizielle MCP Registry ein (Login per GitHub-OIDC,
    kein Token). Die Version in `server.json` mit erhöhen – ein Test prüft, dass sie passt.
    Schlug PyPI oder die Registry fehl: Actions → „Publish existing release“ → Run workflow mit dem Tag

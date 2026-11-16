@@ -6,7 +6,7 @@
 # (README, "Installation")
 # SearXNG-API danach / afterwards: http://localhost:8888/search?q=test&format=json
 # Fertiges Image statt lokalem Build / prebuilt image instead of a local build:
-#   WEBSEARCH_IMAGE=ghcr.io/c0decave/web-search-mcp:0.3.0rc1 docker compose up -d --no-build
+#   WEBSEARCH_IMAGE=ghcr.io/c0decave/multi-websearch-mcp:0.3.0rc2 docker compose up -d --no-build
 # Ohne WEBSEARCH_IMAGE baut compose das Image lokal als websearch:local.
 x-logging: &logging
   options: { max-size: "5m", max-file: "3" }

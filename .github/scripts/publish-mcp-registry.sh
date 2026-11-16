@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # server.json in die offizielle MCP Registry eintragen (registry.modelcontextprotocol.io).
 # Läuft in GitHub Actions (Login per OIDC, braucht "permissions: id-token: write").
-# Aufruf: .github/scripts/publish-mcp-registry.sh <version>   (z.B. 0.3.0rc1, ohne "v")
+# Aufruf: .github/scripts/publish-mcp-registry.sh <version>   (z.B. 0.3.0rc2, ohne "v")
 #
-# Die Registry prüft die Eigentümerschaft über die Zeile "mcp-name: io.github.c0decave/web-search-mcp"
+# Die Registry prüft die Eigentümerschaft über die Zeile "mcp-name: io.github.c0decave/multi-websearch-mcp"
 # in der README-Beschreibung des PyPI-Pakets - das Paket muss also schon auf PyPI liegen.
 set -euo pipefail
 
@@ -34,7 +34,7 @@ publisher="$tmp/mcp-publisher"
 # PyPI braucht nach dem Upload manchmal einen Moment, bis die neue Version in der JSON-API steht
 for attempt in 1 2 3 4 5 6; do
   if "$publisher" publish; then
-    echo "MCP Registry: io.github.c0decave/web-search-mcp $version veröffentlicht"
+    echo "MCP Registry: io.github.c0decave/multi-websearch-mcp $version veröffentlicht"
     exit 0
   fi
   echo "Versuch $attempt fehlgeschlagen, neuer Versuch in 30 s ..."

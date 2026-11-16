@@ -37,8 +37,8 @@ docker compose logs -f websearch-monitor    # new results (JSON lines) and messa
   runs as UID 977 instead of root and mounts `searxng/` read-only (the file stays normally editable on the host).
   Coming from an older version whose SearXNG already took over `./searxng`: run `sudo chown -R "$USER" searxng`
   once.
-- Prebuilt image instead of a local build ([releases](https://github.com/c0decave/web-search-mcp/releases)):
-  `WEBSEARCH_IMAGE=ghcr.io/c0decave/web-search-mcp:0.3.0rc1` in `.env`, then
+- Prebuilt image instead of a local build ([releases](https://github.com/c0decave/multi-websearch-mcp/releases)):
+  `WEBSEARCH_IMAGE=ghcr.io/c0decave/multi-websearch-mcp:0.3.0rc2` in `.env`, then
   `docker compose pull && docker compose up -d --no-build` (linux/amd64 and linux/arm64).
 - Update: `git pull && docker compose build && docker compose pull --ignore-buildable && docker compose up -d`.
   The SearXNG image is pinned to the tested version (`SEARXNG_VERSION` in `.env`, e.g. `latest`).
@@ -124,7 +124,7 @@ to be re-run after moving the repo or SearXNG). Foreground: stop with Ctrl+C and
 ### With pip (without Docker)
 
 ```bash
-pip install --pre websearch-mcp             # package name on PyPI (--pre while it is a pre-release); command: websearch
+pip install --pre multi-websearch-mcp       # package name on PyPI (--pre while it is a pre-release); command: websearch
 # or from the repo: python3 -m venv .venv && . .venv/bin/activate && pip install -e '.[dev]'
 export SEARXNG_URL=http://127.0.0.1:8888    # your SearXNG instance; without it the other sources still run
 set -a; . ./.env; set +a                    # optional: load your .env (API keys, webhook, ...)
@@ -204,7 +204,7 @@ T=$(/path/to/repo/.venv/bin/python -m websearch.envfile --get MCP_AUTH_TOKEN /pa
 # stdio inside the bubblewrap sandbox
 claude mcp add -s user websearch -- /path/to/repo/deploy/bwrap/websearch-bwrap mcp
 # stdio from PyPI (no clone needed; pin the version while it is a pre-release)
-claude mcp add -s user websearch -- uvx --from websearch-mcp==0.3.0rc1 websearch --env-file /path/to/.env mcp
+claude mcp add -s user websearch -- uvx multi-websearch-mcp@0.3.0rc2 --env-file /path/to/.env
 ```
 
 To change an entry (new token, stdio instead of HTTP): first `claude mcp remove -s user websearch`, then add it
@@ -545,9 +545,9 @@ CI (`.github/workflows/ci.yml`): pytest on Python 3.10–3.13 with `requirements
 2. If dependencies changed: `uv pip compile pyproject.toml --universal --python-version 3.10 -o requirements.lock`.
 3. Add a section to `CHANGELOG.md` (`## [X.Y.Z] – date`; it becomes the text of the GitHub release).
 4. `git tag vX.Y.Z && git push origin vX.Y.Z` – `.github/workflows/release.yml` checks tag and version, runs
-   the tests, publishes to PyPI (trusted publishing, package `websearch-mcp`), the multi-arch image to
-   `ghcr.io/c0decave/web-search-mcp`, and creates the GitHub release. Versions with `a`, `b` or `rc` (e.g.
-   `0.3.0rc1`) are marked as pre-release: no `latest` image, and pip installs them only with `--pre`.
+   the tests, publishes to PyPI (trusted publishing, package `multi-websearch-mcp`), the multi-arch image to
+   `ghcr.io/c0decave/multi-websearch-mcp`, and creates the GitHub release. Versions with `a`, `b` or `rc` (e.g.
+   `0.3.0rc2`) are marked as pre-release: no `latest` image, and pip installs them only with `--pre`.
    After PyPI, the job `mcp-registry` publishes `server.json` to the official MCP Registry (login via GitHub
    OIDC, no token). Bump the version in `server.json` too – a test checks that it matches.
    If PyPI or the registry failed: Actions → "Publish existing release" → Run workflow with the tag

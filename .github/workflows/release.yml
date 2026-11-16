@@ -55,7 +55,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: pypi
-      url: https://pypi.org/project/websearch-mcp/
+      url: https://pypi.org/project/multi-websearch-mcp/
     permissions:
       id-token: write          # Trusted Publishing (OIDC), kein API-Token nötig
     steps:
@@ -90,7 +90,7 @@ jobs:
         with:
           images: ${{ env.IMAGE }}
           # v1.2.3 -> 1.2.3, 1.2, 1 (nicht bei 0.x), latest (nur für finale Versionen, flavor latest=auto);
-          # Vorabversionen (v0.3.0rc1) bekommen nur ihre Versions-Tags: 0.3.0rc1 (wie __version__) und 0.3.0-rc1
+          # Vorabversionen (v0.3.0rc2) bekommen nur ihre Versions-Tags: 0.3.0rc2 (wie __version__) und 0.3.0-rc1
           tags: |
             type=pep440,pattern={{version}}
             type=semver,pattern={{version}}

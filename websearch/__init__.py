@@ -12,7 +12,7 @@
     asyncio.run(main())
 """
 
-__version__ = "0.3.0rc1"
+__version__ = "0.3.0rc2"
 
 from .core import Result, SearchResponse, SourceStatus  # noqa: E402
 from .engine import DEFAULT_POLICY, KINDS, SearchEngine, TierPolicy  # noqa: E402

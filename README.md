@@ -1,11 +1,11 @@
 # websearch – web search MCP server that avoids captchas
 
-[![CI](https://github.com/c0decave/web-search-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/c0decave/web-search-mcp/actions/workflows/ci.yml)
-[![PyPI](https://img.shields.io/pypi/v/websearch-mcp?include_prereleases&label=PyPI)](https://pypi.org/project/websearch-mcp/)
+[![CI](https://github.com/c0decave/multi-websearch-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/c0decave/multi-websearch-mcp/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/multi-websearch-mcp?include_prereleases&label=PyPI)](https://pypi.org/project/multi-websearch-mcp/)
 [![Python](https://img.shields.io/badge/python-3.10%E2%80%933.13-blue)](pyproject.toml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-<!-- mcp-name: io.github.c0decave/web-search-mcp -->
+<!-- mcp-name: io.github.c0decave/multi-websearch-mcp -->
 
 **English** · [Deutsch](README.de.md) · [Quickstart](docs/QUICKSTART.md) · [Usage](docs/USAGE.md) · [Changelog](CHANGELOG.md)
 
@@ -16,8 +16,8 @@ Marginalia, Reddit). Cheap paid APIs are an optional last resort with hard spend
 **MCP server** (stdio and HTTP), a CLI, a Python API and a **monitoring service** that reports only new results to
 Slack, Discord, Teams, Telegram, ntfy, e-mail or a webhook.
 
-> **Pre-release 0.3.0rc1.** Feature-complete and tested (≈680 offline tests), but still in its pilot phase.
-> Please report problems as [issues](https://github.com/c0decave/web-search-mcp/issues).
+> **Pre-release 0.3.0rc2.** Feature-complete and tested (≈680 offline tests), but still in its pilot phase.
+> Please report problems as [issues](https://github.com/c0decave/multi-websearch-mcp/issues).
 
 ## Why
 
@@ -57,7 +57,7 @@ sources found each hit. All tools have input and output schemas, and errors reac
 **Full setup with Docker** (all sources, monitoring, HTTP MCP server with a token):
 
 ```bash
-git clone https://github.com/c0decave/web-search-mcp.git && cd web-search-mcp
+git clone https://github.com/c0decave/multi-websearch-mcp.git && cd multi-websearch-mcp
 python3 -m venv .venv && . .venv/bin/activate && pip install -e .
 websearch init --contact you@your-company.com --lang en   # .env with secrets and your contact
 docker compose up -d                                       # SearXNG, MCP server on 127.0.0.1:8765, monitor
@@ -73,7 +73,7 @@ T=$(.venv/bin/python -m websearch.envfile --get MCP_AUTH_TOKEN .env) && \
   "mcpServers": {
     "websearch": {
       "command": "uvx",
-      "args": ["--from", "websearch-mcp==0.3.0rc1", "websearch", "mcp"],
+      "args": ["multi-websearch-mcp@0.3.0rc2"],
       "env": { "WEBSEARCH_UA": "websearch/0.3 (you@your-company.com)" }
     }
   }

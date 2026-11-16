@@ -1,6 +1,6 @@
 [project]
 # Distributionsname auf PyPI ("websearch" ist dort schon vergeben); Importname und CLI bleiben "websearch"
-name = "websearch-mcp"
+name = "multi-websearch-mcp"
 dynamic = ["version"]            # aus websearch/__init__.py (siehe [tool.hatch.version])
 description = "Parallel, captcha-avoiding web search over free sources (SearXNG, Bing RSS, Google News, GDELT, ...) with CLI, MCP server and monitoring"
 readme = "README.md"
@@ -44,18 +44,18 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/c0decave/web-search-mcp"
-Documentation = "https://github.com/c0decave/web-search-mcp/blob/main/docs/USAGE.md"
-Repository = "https://github.com/c0decave/web-search-mcp"
-Issues = "https://github.com/c0decave/web-search-mcp/issues"
-Changelog = "https://github.com/c0decave/web-search-mcp/blob/main/CHANGELOG.md"
+Homepage = "https://github.com/c0decave/multi-websearch-mcp"
+Documentation = "https://github.com/c0decave/multi-websearch-mcp/blob/main/docs/USAGE.md"
+Repository = "https://github.com/c0decave/multi-websearch-mcp"
+Issues = "https://github.com/c0decave/multi-websearch-mcp/issues"
+Changelog = "https://github.com/c0decave/multi-websearch-mcp/blob/main/CHANGELOG.md"
 
 [project.optional-dependencies]
 dev = ["pytest>=8", "mypy>=1.10"]
 
 [project.scripts]
 websearch = "websearch.__main__:run"
-websearch-mcp = "websearch.__main__:run_mcp"   # direkt der MCP-Server (uvx websearch-mcp)
+multi-websearch-mcp = "websearch.__main__:run_mcp"   # direkt der MCP-Server (uvx multi-websearch-mcp)
 
 [build-system]
 requires = ["hatchling>=1.27"]   # PEP 639 (license = "<SPDX>" + license-files), explizite sdist-Liste

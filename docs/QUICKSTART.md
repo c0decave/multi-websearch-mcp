@@ -19,7 +19,7 @@ MCP server in one minute without Docker.
 ## A: Docker (5 minutes)
 
 ```bash
-git clone https://github.com/c0decave/web-search-mcp.git && cd web-search-mcp
+git clone https://github.com/c0decave/multi-websearch-mcp.git && cd multi-websearch-mcp
 python3 -m venv .venv && . .venv/bin/activate && pip install -e .
 websearch init --contact you@your-company.com --lang en   # .env with secrets, contact, language; creates watches/
 docker compose up -d                                       # SearXNG :8888, MCP server :8765, monitoring
@@ -68,8 +68,8 @@ into the header:
 {
   "mcpServers": {
     "websearch": {
-      "command": "/path/to/web-search-mcp/.venv/bin/python",
-      "args": ["-m", "websearch", "--env-file", "/path/to/web-search-mcp/.env", "mcp"]
+      "command": "/path/to/multi-websearch-mcp/.venv/bin/python",
+      "args": ["-m", "websearch", "--env-file", "/path/to/multi-websearch-mcp/.env", "mcp"]
     }
   }
 }
@@ -85,7 +85,7 @@ answer.
 ```bash
 claude mcp add -s user websearch \
   -e WEBSEARCH_UA="websearch/0.3 (you@your-company.com)" \
-  -- uvx --from websearch-mcp==0.3.0rc1 websearch mcp
+  -- uvx multi-websearch-mcp@0.3.0rc2
 ```
 
 **Claude Desktop, Cursor, Windsurf** (`claude_desktop_config.json`, `~/.cursor/mcp.json`, …):
@@ -95,7 +95,7 @@ claude mcp add -s user websearch \
   "mcpServers": {
     "websearch": {
       "command": "uvx",
-      "args": ["--from", "websearch-mcp==0.3.0rc1", "websearch", "mcp"],
+      "args": ["multi-websearch-mcp@0.3.0rc2"],
       "env": { "WEBSEARCH_UA": "websearch/0.3 (you@your-company.com)" }
     }
   }
@@ -110,18 +110,18 @@ claude mcp add -s user websearch \
     "websearch": {
       "type": "stdio",
       "command": "uvx",
-      "args": ["--from", "websearch-mcp==0.3.0rc1", "websearch", "mcp"],
+      "args": ["multi-websearch-mcp@0.3.0rc2"],
       "env": { "WEBSEARCH_UA": "websearch/0.3 (you@your-company.com)" }
     }
   }
 }
 ```
 
-The version is pinned because this is a pre-release; once 0.3.0 is out, `--from websearch-mcp` is enough.
-To try it on the command line first: `uvx --from websearch-mcp==0.3.0rc1 websearch search "open source metasearch" -n 5`.
+The version is pinned because this is a pre-release; once 0.3.0 is out, `uvx multi-websearch-mcp` is enough.
+To try it on the command line first: `uvx --from multi-websearch-mcp==0.3.0rc2 websearch search "open source metasearch" -n 5`.
 
 Later you can point the same server at a SearXNG instance of your own with `SEARXNG_URL` in `env`, or keep all
-settings in a file: `"args": [..., "websearch", "--env-file", "/path/to/.env", "mcp"]`.
+settings in a file: `"args": ["multi-websearch-mcp@0.3.0rc2", "--env-file", "/path/to/.env"]`.
 
 ## Check that it works
 

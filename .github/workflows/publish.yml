@@ -1,6 +1,6 @@
 # Ein bestehendes GitHub-Release nachträglich veröffentlichen: dessen Dateien auf PyPI (übersprungen, wenn die
 # Version dort schon liegt), dann server.json in die MCP Registry. Für den Fall, dass beim Release PyPI oder die
-# Registry fehlschlug. Starten: Actions -> "Publish existing release" -> Run workflow, Tag angeben (z.B. v0.3.0rc1).
+# Registry fehlschlug. Starten: Actions -> "Publish existing release" -> Run workflow, Tag angeben (z.B. v0.3.0rc2).
 # Für den PyPI-Upload von hier muss auf PyPI auch publish.yml als Trusted Publisher eingetragen sein.
 name: Publish existing release
 
@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release-Tag, z.B. v0.3.0rc1"
+        description: "Release-Tag, z.B. v0.3.0rc2"
         required: true
 
 permissions:
@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: pypi
-      url: https://pypi.org/project/websearch-mcp/
+      url: https://pypi.org/project/multi-websearch-mcp/
     permissions:
       contents: read
       id-token: write          # Trusted Publishing (dafür auf PyPI auch diesen Workflow als Publisher eintragen)
@@ -30,9 +30,9 @@ jobs:
         env:
           TAG: ${{ inputs.tag }}
         run: |
-          code=$(curl -s -o /dev/null -w '%{http_code}' "https://pypi.org/pypi/websearch-mcp/${TAG#v}/json")
+          code=$(curl -s -o /dev/null -w '%{http_code}' "https://pypi.org/pypi/multi-websearch-mcp/${TAG#v}/json")
           echo "exists=$([ "$code" = 200 ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
-          [ "$code" = 200 ] && echo "websearch-mcp ${TAG#v} liegt schon auf PyPI - Upload wird übersprungen" || true
+          [ "$code" = 200 ] && echo "multi-websearch-mcp ${TAG#v} liegt schon auf PyPI - Upload wird übersprungen" || true
       - name: Dateien des Releases laden (genau die, die der Release-Workflow gebaut und getestet hat)
         if: steps.check.outputs.exists != 'true'
         env:
