@@ -5,6 +5,8 @@
 [![Python](https://img.shields.io/badge/python-3.10%E2%80%933.13-blue)](pyproject.toml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
+<!-- mcp-name: io.github.c0decave/web-search-mcp -->
+
 **English** · [Deutsch](README.de.md) · [Quickstart](docs/QUICKSTART.md) · [Usage](docs/USAGE.md) · [Changelog](CHANGELOG.md)
 
 Parallel web, news, image and video search **plus page fetching** for AI agents, built on free sources:

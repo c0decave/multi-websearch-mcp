@@ -748,7 +748,10 @@ def test_podman_install_renders_units_and_private_env(tmp_path):
     repo, env, home, log = _podman_setup(tmp_path)
     (repo / ".env").write_text('SEARXNG_SECRET=abc # Kommentar\nWEBSEARCH_UA="websearch/0.3 (ops@firma.de)"\n'
                                "EXA_API_KEY=k-1\nEMPTY=\nSEARXNG_VERSION=2026.11.1\n")
-    p = subprocess.run(["bash", str(repo / "deploy/podman/install.sh")], capture_output=True, text=True, env=env)
+    no_memory = tmp_path / "cgroup.controllers.no-memory"      # nicht vom echten Rechner abhängen (CI delegiert memory)
+    no_memory.write_text("cpu pids\n")
+    p = subprocess.run(["bash", str(repo / "deploy/podman/install.sh")], capture_output=True, text=True,
+                       env={**env, "WEBSEARCH_CGROUP_CONTROLLERS": str(no_memory)})
     assert p.returncode == 0, p.stderr
     units = home / ".config/containers/systemd"
     for f in units.iterdir():

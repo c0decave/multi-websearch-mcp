@@ -27,6 +27,8 @@ First public pre-release.
   Discord, Microsoft Teams, Telegram or e-mail.
 - **CLI** (`search`, `many`, `fetch`, `monitor`, `status`, `sources`, `doctor`, `init`, `metrics`, `mcp`) and a
   **Python API** (`websearch.SearchEngine`).
+- **`websearch-mcp`** command that starts the MCP server directly (`uvx websearch-mcp`), plus `server.json`
+  for the official MCP Registry and `glama.json` for Glama.
 - **`websearch init`** creates `.env` with random secrets and an MCP token; **`websearch doctor`** checks the
   whole setup and says how to fix each problem.
 - **Prometheus metrics** (`/metrics`, `websearch metrics`) and a health check (`/healthz`).

@@ -55,6 +55,7 @@ dev = ["pytest>=8", "mypy>=1.10"]
 
 [project.scripts]
 websearch = "websearch.__main__:run"
+websearch-mcp = "websearch.__main__:run_mcp"   # direkt der MCP-Server (uvx websearch-mcp)
 
 [build-system]
 requires = ["hatchling>=1.27"]   # PEP 639 (license = "<SPDX>" + license-files), explizite sdist-Liste

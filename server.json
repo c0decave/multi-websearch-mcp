@@ -1,0 +1,43 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.c0decave/web-search-mcp",
+  "title": "websearch",
+  "description": "Captcha-avoiding web, news, image and video search plus page fetching over free sources",
+  "repository": {
+    "url": "https://github.com/c0decave/web-search-mcp",
+    "source": "github",
+    "id": "1460215503"
+  },
+  "version": "0.3.0rc1",
+  "packages": [
+    {
+      "registryType": "pypi",
+      "identifier": "websearch-mcp",
+      "version": "0.3.0rc1",
+      "runtimeHint": "uvx",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "WEBSEARCH_UA",
+          "description": "User-Agent with your contact (e-mail or URL), e.g. 'websearch/0.3 (you@example.org)'; Wikimedia, GDELT and Hacker News ask for it",
+          "isRequired": true,
+          "isSecret": false
+        },
+        {
+          "name": "SEARXNG_URL",
+          "description": "Your SearXNG instance (default http://127.0.0.1:8888); without it the feeds and APIs still answer",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "WEBSEARCH_MCP_PAID",
+          "description": "0 = agents may never use paid APIs",
+          "isRequired": false,
+          "isSecret": false
+        }
+      ]
+    }
+  ]
+}

@@ -534,3 +534,13 @@ def run() -> None:
 
 if __name__ == "__main__":
     run()
+
+
+def run_mcp() -> None:
+    """Einstiegspunkt ``websearch-mcp`` = ``websearch [globale Optionen] mcp [--http]``.
+
+    Damit startet ``uvx websearch-mcp`` (so rufen MCP-Registries und Clients ein PyPI-Paket auf) direkt den
+    MCP-Server; ``--env-file``, ``-v`` und ``-q`` gelten wie bei ``websearch``."""
+    args = sys.argv[1:]
+    sys.argv = [sys.argv[0], *[a for a in args if a != "--http"], "mcp", *[a for a in args if a == "--http"]]
+    run()

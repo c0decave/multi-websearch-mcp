@@ -120,3 +120,15 @@ def test_many_with_non_utf8_file_is_usage_error(tmp_path, capsys):
     q.write_bytes("Straße\n".encode("latin-1"))
     assert cli.main(["many", str(q)]) == 2
     assert "UTF-8" in capsys.readouterr().err
+
+
+def test_websearch_mcp_entry_point_starts_the_mcp_server(monkeypatch):
+    """uvx websearch-mcp [--env-file F] [--http] == websearch [--env-file F] mcp [--http]"""
+    import websearch.__main__ as M
+    seen = []
+    monkeypatch.setattr(M, "run", lambda: seen.append(list(M.sys.argv[1:])))
+    for argv, want in (([], ["mcp"]), (["--http"], ["mcp", "--http"]),
+                       (["--env-file", ".env", "-v", "--http"], ["--env-file", ".env", "-v", "mcp", "--http"])):
+        monkeypatch.setattr(M.sys, "argv", ["websearch-mcp", *argv])
+        M.run_mcp()
+        assert seen[-1] == want
