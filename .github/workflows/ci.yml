@@ -31,7 +31,9 @@ jobs:
           enable-cache: true
           cache-dependency-glob: requirements.lock
       - name: Abhängigkeiten aus requirements.lock
-        run: uv pip install --system -r requirements.lock "pytest==9.2.0" "mypy==2.4.1"
+        run: |
+          uv pip install --system -r requirements.lock "pytest==9.2.0" "mypy==2.4.1"
+          uv pip install --system --no-deps -e .   # das Paket selbst: die bwrap-Wrapper starten ohne PYTHONPATH
       - name: bubblewrap (für die echten Sandbox-Tests in tests/test_deploy.py)
         run: sudo apt-get install -y --no-install-recommends bubblewrap
       - name: pytest
@@ -47,7 +49,11 @@ jobs:
           if not os.path.exists("junit.xml"):
               raise SystemExit(0)
           esc = lambda t: t.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
-          for case in ET.parse("junit.xml").iter("testcase"):
+          cases = [c for c in ET.parse("junit.xml").iter("testcase")
+                   if c.find("failure") is not None or c.find("error") is not None]
+          names = [f'{c.get("classname")}::{c.get("name")}' for c in cases]
+          print(f"::error title=Failed tests ({len(names)})::{esc(chr(10).join(names))}")
+          for case in cases:
               for bad in list(case.iter("failure")) + list(case.iter("error")):
                   name = f'{case.get("classname")}::{case.get("name")}'
                   text = ((bad.get("message") or "") + "\n" + (bad.text or ""))[-3000:]
